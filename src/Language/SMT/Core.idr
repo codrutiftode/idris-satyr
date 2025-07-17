@@ -9,6 +9,7 @@ import MAST.Initiality
 
 import MAST.Simple.Core
 import MAST.Simple.Combinator.Either
+import MAST.Simple.Combinator.List.Quantifiers
 
 data TyCore : Type where
   TyBool : TyCore
@@ -37,30 +38,34 @@ CoreNeed : SimpleSig
 CoreNeed x = TyCore
 
 CoreNeedSig : Signature
-CoreNeedSig = MkSignature 
+CoreNeedSig = MkSignature
   { ops = CoreNeed
-  , map = \_ => id
+  , map = \_ => \case
+      TyBool => TyBool
   }
 
+public export
+infixr 4 |=
+
+record (|=) (l, r : SimpleSig) where
+  constructor Fullfill
+  alpha : {0 x : Type} -> r x -> l x
+
+(.TypesAlgebra) : (o : SimpleSig) -> o.algebra
+o.TypesAlgebra = (o.free Void).algebra
+
 0
-Fullfill : (r : SimpleSig) -> Type
-Fullfill r = (l : SimpleSig ** ({0 x : Type} -> r x -> l x))
+(.Types) : (o : SimpleSig) -> Type
+o.Types = o.TypesAlgebra.carrier
 
-(.TypesAlgebra) : (f : Fullfill r) -> f.fst.algebra
-f.TypesAlgebra = (f.fst.free Void).algebra
+algebraFunctor : (l |= r) -> l.algebraOn a -> r.algebraOn a
+algebraFunctor f lalg = lalg . f.alpha
 
-0
-(.Types) : (f : Fullfill r) -> Type
-f.Types = f.TypesAlgebra.carrier
+(.get) : {l : SimpleSig} -> (l |= r) -> r.algebraOn (l.Types)
+f.get = algebraFunctor f (l.TypesAlgebra.roll)
 
-algebraFunctor : (f : Fullfill r) -> (f.fst.algebraOn a) -> r.algebraOn a
-algebraFunctor f lalg = lalg . f.snd
-
-(.get) : (f : Fullfill r) -> r.algebraOn (f.Types)
-f.get = algebraFunctor f (f.TypesAlgebra.roll)
-
-data CoreSig : (f : Fullfill CoreNeed) -> 
-  f.Types.HomogeneousFamily -> f.Types.HomogeneousFamily where
+data CoreSig : (f : (l |= CoreNeed)) -> 
+  l.Types.HomogeneousFamily -> l.Types.HomogeneousFamily where
   Eq   : fam a ctx ->
          fam a ctx ->
          CoreSig f fam (f.get TyBool) ctx
@@ -75,59 +80,59 @@ HomoSortingSystem = MkSortingSystemOver
 
 -- CoProdFullfill : List ((need : Need ** Fullfill need)) -> 
 
-0
-CoreFullfill : (other : Signature) -> Fullfill CoreNeed
-CoreFullfill other = ((Either CoreNeedSig other).ops ** Left)
-
 IntNeed : SimpleSig
 IntNeed x = TyInts
 
 IntNeedSig : Signature
 IntNeedSig = MkSignature 
   { ops = IntNeed
-  , map = \_ => id
+  , map = \_ => \case
+      TyInt => TyInt
   }
 
-0  
-term : {ctx : ((CoreFullfill IntNeedSig) .Types).Ctx} -> 
-  Term HomoSortingSystem (CoreSig (CoreFullfill IntNeedSig)) 
-  Var ((CoreFullfill IntNeedSig) .get TyBool) ctx
+-- 0  
+-- term : {ctx : ((CoreFullfill IntNeedSig) .Types).Ctx} -> 
+--   Term HomoSortingSystem (CoreSig (CoreFullfill IntNeedSig)) 
+--   Var ((CoreFullfill IntNeedSig) .get TyBool) ctx
 -- term = Op $ And (Op $ ABool True) (Op $ ABool False)
 
-0
-IntFullfill : (other : Signature) -> Fullfill IntNeed
-IntFullfill other = ((Either other IntNeedSig).ops ** Right)
 
-data IntSig : (f : Fullfill IntNeed) -> 
-  f.Types.HomogeneousFamily -> f.Types.HomogeneousFamily where
+data IntSig : (f : (l |= IntNeed)) -> 
+  l.Types.HomogeneousFamily -> l.Types.HomogeneousFamily where
   Add : fam (f.get TyInt) ctx ->
         fam (f.get TyInt) ctx ->
         IntSig f fam (f.get TyInt) ctx
   Num : Int -> IntSig f fam (f.get TyInt) ctx
 
 0
-IntsCoreFun : Type
-IntsCoreFun = ((CoreFullfill IntNeedSig).Types).HomogeneousFamily -> 
-           ((CoreFullfill IntNeedSig).Types).HomogeneousFamily
-
-0
-comboFun : (a : Bool) -> IntsCoreFun
-comboFun False = CoreSig (CoreFullfill IntNeedSig)
-comboFun True = IntSig (IntFullfill CoreNeedSig)
+IntsCoreTypesSig : SimpleSig
+IntsCoreTypesSig = (Any [IntNeedSig, CoreNeedSig]).ops
 
 0
 IntsCoreTypes : Type
-IntsCoreTypes = (CoreFullfill IntNeedSig).Types
+IntsCoreTypes = IntsCoreTypesSig .Types
+
+0
+IntsCoreFun : Type
+IntsCoreFun = IntsCoreTypes .HomogeneousFamily -> 
+              IntsCoreTypes .HomogeneousFamily
+
+-- TODO: move to mast combinators
+-- namespace Any
+Any : List ((sort,bind) ====> (sort,bind)) -> (sort,bind) ====> (sort,bind)
+Any fs x ty ctx = Any (\f => f x ty ctx) fs
 
 0
 IntsCore : IntsCoreFun
-IntsCore = CoProd comboFun
+IntsCore = Any [CoreSig (Fullfill $ There . Here),
+                IntSig (Fullfill Here)]
 
 0
-term1 : {ctx : IntsCoreTypes .Ctx} -> 
+term1 : {ctx : IntsCoreTypes .Ctx} ->
   Term HomoSortingSystem IntsCore
-  Var ((CoreFullfill IntNeedSig) .get TyBool) ctx
-term1 = Op $ (False ** (Eq (Op (True ** Num 3)) (Op (True ** Num 4))))
+  Var ((Fullfill $ There . Here) .get TyBool) ctx
+term1 = Op $ Here (Eq (Op $ (There . Here) $ Num 3) 
+                      (Op $ (There . Here) $ Num 4))
 
 -- CoreSig : sort.HomogeneousFamily -> sort.HomogeneousFamily
 -- CoreSig fam s ctx = (i : Int ** case i of
