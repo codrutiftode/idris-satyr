@@ -8,17 +8,17 @@ import MAST.Initiality
 
 import MAST.Simple.Core
 
-public export  
+public export
 0
 (.Signature) : (need : SimpleSig) -> Type
-need.Signature = 
-  {l : SimpleSig} -> 
+need.Signature =
+  {l : SimpleSig} ->
   {0 fstSort, sndSort : Type} ->
-  (f : (l |= need)) -> 
+  (f : (l |= need)) ->
   (sys : SortingSystemOver fstSort sndSort l.Types) ->
   sys.RSortedFamilyFun
 
-public export    
+public export
 HomSorting : SortingSystemOver a Void a
 HomSorting = MkSortingSystemOver
   { fst = id
@@ -26,7 +26,7 @@ HomSorting = MkSortingSystemOver
   , copair = \f, _ => f
   }
 
-public export  
+public export
 0
 (.Hom) : (sig : need.Signature) -> (HomSorting {a = need.Types}) .RSortedFamilyFun
 sig.Hom = sig (Fullfill id) HomSorting

@@ -56,14 +56,14 @@ data CoreSig : (CoreNeed .ops) .Signature where
          fam (f.get TyBool) ctx ->
          CoreSig f sys fam (f.get TyBool) ctx
   ABool : Bool -> CoreSig f sys fam (f.get TyBool) ctx
-  
+
 CoreSigMap : (CoreSig .Hom).RSortedFamilyFunctor
 CoreSigMap = MkRSortedFamilyFunctor
   { map = \f => \case
          (Eq x y) => Eq (f x) (f y)
          (And x y) => And (f x) (f y)
          (ABool x) => ABool x
-  }  
+  }
 
 ExtendOne : (s0 : sort) -> ((), b) ====> (sort, b)
 ExtendOne s0 = Extend (const s0)
@@ -82,7 +82,7 @@ All fs x ty ctx = All (\f => f x ty ctx) fs
 BoolSig, AndSig : (CoreNeed .ops).Signature
 BoolSig f sys = Const (\s => \ctx => Bool)
 AndSig  f sys =
-  All [ExtendOne (f.get TyBool) . ((f.get TyBool) .@), 
+  All [ExtendOne (f.get TyBool) . ((f.get TyBool) .@),
        ExtendOne (f.get TyBool) . ((f.get TyBool) .@)]
 
 BoolSigMap : (BoolSig f sys).RSortedFamilyFunctor
@@ -90,24 +90,25 @@ BoolSigMap = MkRSortedFamilyFunctor (\_ => id)
 
 -- AndSigMap : (AndSig f sys).RSortedFamilyFunctor
 -- AndSigMap = MkRSortedFamilyFunctor (\f => mapProperty f)
- 
+
 data CoreOps = ABool' | And'
 
-0  
-CoreSig' : (CoreNeed .ops) .Signature  
+0
+CoreSig' : (CoreNeed .ops) .Signature
 CoreSig' f sys = CoProd (\x : CoreOps => case x of
    ABool' => BoolSig f sys
    And'   => AndSig f sys)
 
 0
-CoreSigMap' : (CoreSig' f sys).RSortedFamilyFunctor  
+CoreSigMap' : (CoreSig' f sys).RSortedFamilyFunctor
 CoreSigMap' = CoProdMap ?weijfo_0 -- CoProdMap {a = CoreOps} ?a ?b
 
 term0 : HomTerm CoreSig' (HomFullfill .get TyBool) [<]
-term0 = Op (And' ** 
-  [Pack {ty' = ()} (Op (ABool' ** False)), 
+term0 = Op
+  (And' **
+  [Pack {ty' = ()} (Op (ABool' ** False)),
    Pack {ty' = ()} (Op (ABool' ** False))])
-
+{-
 {-
 0
 CoreIntNeed : Signature

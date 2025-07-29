@@ -14,7 +14,7 @@ record (|=) (l, r : SimpleSig) where
 
 public export
 -- Note: in general, might want to have a type for variables other than Void
-(.TypesAlgebra) : (o : SimpleSig) -> o.algebra
+(.TypesAlgebra) : (0 o : SimpleSig) -> o.algebra
 o.TypesAlgebra = (o.free Void).algebra
 
 public export
@@ -27,5 +27,5 @@ algebraFunctor : (l |= r) -> l.algebraOn a -> r.algebraOn a
 algebraFunctor f lalg = lalg . f.alpha
 
 public export
-(.get) : {l : SimpleSig} -> (l |= r) -> r.algebraOn (l.Types)
+(.get) : (l |= r) -> r.algebraOn (l.Types)
 f.get = algebraFunctor f (l.TypesAlgebra.roll)

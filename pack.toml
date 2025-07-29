@@ -1,5 +1,5 @@
 # The package collection to use
-collection = "nightly-250227"
+#collection = "nightly-250227"
 
 [install]
 
@@ -66,6 +66,6 @@ repl.rlwrap = false
 # ipkg   = "toml.ipkg"
 
 [custom.all.mast]
-type = "local"
-path = "idris-mast"
-ipkg = "mast.ipkg"
+type   = "github"
+url    = "git@github.com:ohad/idris-mast"
+commit = "fetch-latest:mast-refactor"
