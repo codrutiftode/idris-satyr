@@ -15,7 +15,7 @@ need.Signature =
   {l : SimpleSig} ->
   {0 fstSort, sndSort : Type} ->
   (f : (l |= need)) ->
-  (sys : SortingSystemOver fstSort sndSort l.Types) ->
+  (sys : SortingSystemOver fstSort sndSort l.Types) ->  
   sys.RSortedFamilyFun
 
 public export
@@ -38,4 +38,4 @@ HomFullfill = Fullfill {alpha = id}
 public export
 0
 HomTerm : (sig : need.Signature) -> (need.Types).SortedFamilyOver (need.Types)
-HomTerm sig = Term HomSorting (sig.Hom) Var
+HomTerm sig = Term HomSorting (sig.Hom) Var -- (sig.Hom) Var

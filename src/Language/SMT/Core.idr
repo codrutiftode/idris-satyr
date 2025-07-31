@@ -1,9 +1,13 @@
 module Language.SMT.Core
 
 import Data.DPair
+import Data.List1
+import Data.List
+import Data.Nat
 
 import Language.SMT.Fullfill
 import Language.SMT.Signature
+import Language.SMT.Arity
 
 import MAST.Core
 import MAST.Substitution
@@ -16,6 +20,7 @@ import MAST.Simple.Core
 import MAST.Simple.Combinator.Either
 import MAST.Simple.Combinator.List.Quantifiers
 
+%hide Data.List.sort
 %hide Builtin.DPair.DPair.(.fst)
 %hide Builtin.DPair.DPair.(.snd)
 
@@ -25,7 +30,6 @@ import MAST.Simple.Combinator.List.Quantifiers
 %hide Data.DPair.Subset.Subset.(.snd)
 
 {-
-
 Signatures structure:
 
 - quantifiers : forall, exists
@@ -47,68 +51,56 @@ CoreNeed = MkSignature
       TyBool => TyBool
   }
 
-data CoreSig : (CoreNeed .ops) .Signature where
-  Eq   : {a : l.Types} ->
-         fam a ctx ->
-         fam a ctx ->
-         CoreSig f sys fam (f.get TyBool) ctx
-  And  : fam (f.get TyBool) ctx ->
-         fam (f.get TyBool) ctx ->
-         CoreSig f sys fam (f.get TyBool) ctx
-  ABool : Bool -> CoreSig f sys fam (f.get TyBool) ctx
+data CoreOps = ABool | Not | Implies | And | Or | Xor | Eq | Distinct | Ite
 
-CoreSigMap : (CoreSig .Hom).RSortedFamilyFunctor
-CoreSigMap = MkRSortedFamilyFunctor
-  { map = \f => \case
-         (Eq x y) => Eq (f x) (f y)
-         (And x y) => And (f x) (f y)
-         (ABool x) => ABool x
-  }
-
-ExtendOne : (s0 : sort) -> ((), b) ====> (sort, b)
-ExtendOne s0 = Extend (const s0)
-
-public export
-infix 5 .@
+labelToArity : (f : l |= CoreNeed .ops) -> CoreOps -> Arity (l.Types)
+labelToArity f ABool    = (Const (f.get TyBool) Bool)
+labelToArity f Not      = [f.get TyBool] :=> (f.get TyBool)
+labelToArity f Implies  = [f.get TyBool, f.get TyBool] :=> (f.get TyBool)
+labelToArity f And      = [f.get TyBool, f.get TyBool] :=> (f.get TyBool)
+labelToArity f Or       = [f.get TyBool, f.get TyBool] :=> (f.get TyBool)
+labelToArity f Xor      = [f.get TyBool, f.get TyBool] :=> (f.get TyBool)
+labelToArity f Eq       = CoProd (\a => [a, a] :=> (f.get TyBool))
+labelToArity f Distinct = CoProd (\a => [a, a] :=> (f.get TyBool))
+labelToArity f Ite      = CoProd (\a => [f.get TyBool, a, a] :=> a)
 
 0
-(.@) : (s0 : sort) -> (sort, b) ====> ((), b)
-(.@) s0 x = (const s0) %| x
+CoreSig : (CoreNeed .ops) .Signature
+CoreSig f sys = CoProd (arity . labelToArity {f})
 
-All : List ((sort,b) ====> (sort',b')) -> (sort,b) ====> (sort',b')
-All fs x ty ctx = All (\f => f x ty ctx) fs
+CoreSigMap : {f : l |= CoreNeed .ops} -> (CoreSig f sys).RSortedFamilyFunctor
+CoreSigMap = CoProdMap (\x => ArityMap (labelToArity f x))
 
-0
-BoolSig, AndSig : (CoreNeed .ops).Signature
-BoolSig f sys = Const (\s => \ctx => Bool)
-AndSig  f sys =
-  All [ExtendOne (f.get TyBool) . ((f.get TyBool) .@),
-       ExtendOne (f.get TyBool) . ((f.get TyBool) .@)]
+CoreSigStrength : {f : l |= CoreNeed .ops} -> (CoreSig f sys).ClosedStrength
+CoreSigStrength = CoProdClosedStrength (\x => ArityStrength (labelToArity f x))
 
-BoolSigMap : (BoolSig f sys).RSortedFamilyFunctor
-BoolSigMap = MkRSortedFamilyFunctor (\_ => id)
+term0 : HomTerm CoreSig (HomFullfill .get TyBool) [<]
+term0 = Op (And ** Pack {ty' = ()}
+  [Op (ABool ** Pack {ty' = ()} False), Op (ABool ** Pack {ty' = ()} False)])
 
--- AndSigMap : (AndSig f sys).RSortedFamilyFunctor
--- AndSigMap = MkRSortedFamilyFunctor (\f => mapProperty f)
+term1 : HomTerm CoreSig (HomFullfill .get TyBool) [<]
+term1 = Op (Eq ** (Op TyBool ** Pack {ty' = ()}
+  [Op (ABool ** Pack {ty' = ()} False), Op (ABool ** Pack {ty' = ()} False)]))
 
-data CoreOps = ABool' | And'
+data Strings : sorts.SortedFamilyOver bind where
+  Str : String -> Strings s ctx
 
-0
-CoreSig' : (CoreNeed .ops) .Signature
-CoreSig' f sys = CoProd (\x : CoreOps => case x of
-   ABool' => BoolSig f sys
-   And'   => AndSig f sys)
-
-0
-CoreSigMap' : (CoreSig' f sys).RSortedFamilyFunctor
-CoreSigMap' = CoProdMap ?weijfo_0 -- CoProdMap {a = CoreOps} ?a ?b
-
-term0 : HomTerm CoreSig' (HomFullfill .get TyBool) [<]
-term0 = Op
-  (And' **
-  [Pack {ty' = ()} (Op (ABool' ** False)),
-   Pack {ty' = ()} (Op (ABool' ** False))])
 {-
+term1 : IO ()
+term1 = let map = (CoreSigMap {f = HomFullfill, sys = HomSorting}).map
+            func : Strings -|> Strings = \case (Str v) => Str (v ++ "!")
+            shed2 = map {p = Strings, q = Strings}
+                    func (Eq ** (Op TyBool ** Pack {ty' = ()} [Str {s = Op TyBool, ctx = [<]} "one", Str {ctx = [<]} "two"]))
+            in case shed2 of (ABool ** t) => putStrLn "fail"
+                             (Not ** t)   => putStrLn "fail"
+                             (And ** t) => putStrLn "fail"
+                             (Eq ** (i ** Pack [Str x, Str y])) => putStrLn x >> putStrLn y
+                             (Or ** t) => putStrLn "fail"
+                             (Xor ** t) => putStrLn "fail"
+                             (Implies ** t) => putStrLn "fail"
+                             (Distinct ** t) => putStrLn "fail"
+                             (Ite ** t) => putStrLn "fail"
+
 {-
 0
 CoreIntNeed : Signature
