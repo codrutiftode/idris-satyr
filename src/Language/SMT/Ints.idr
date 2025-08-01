@@ -1,21 +1,25 @@
 module Language.SMT.Ints
 
-import Data.List.Quantifiers
-
 import Language.SMT.Signature
 import Language.SMT.Fullfill
 import Language.SMT.Arity
 import Language.SMT.Core
 
 import MAST.Core
+import MAST.Substitution
+import MAST.Tensor
 import MAST.Signature
 import MAST.Initiality
-import MAST.Tensor
-
+import MAST.Combinator.List
+import MAST.Combinator.Restrict
+import MAST.Combinator.Extend
+import MAST.Combinator.List.Quantifiers
+import MAST.Combinator.CoProd
+import MAST.Combinator.Prod
+import MAST.Combinator.Const
+import MAST.Combinator.Compose
 import MAST.Simple.Core
-
-%hide Builtin.DPair.DPair.(.fst)
-%hide Builtin.DPair.DPair.(.snd)
+import MAST.Simple.Combinator.List.Quantifiers
 
 data TyInts : Type where
   TyInt : TyInts

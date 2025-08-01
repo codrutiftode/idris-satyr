@@ -6,6 +6,18 @@ import Data.List.Quantifiers
 import MAST.Core
 import MAST.Signature
 import MAST.Tensor
+import MAST.Initiality
+import MAST.Modality
+import MAST.Substitution
+import MAST.Presheaf
+
+import MAST.Combinator.Restrict
+import MAST.Combinator.Extend
+import MAST.Combinator.List.Quantifiers
+import MAST.Combinator.CoProd
+import MAST.Combinator.Prod
+import MAST.Combinator.Const
+import MAST.Combinator.Compose
 
 import MAST.Simple.Combinator.List.Quantifiers
 
@@ -48,7 +60,7 @@ public export
 ArityStrength : (a : Arity sort) -> (arity a).ClosedStrength
 ArityStrength (Const ret x) = ComposeClosedStrength
                                 (ExtendClosedStrength (const ret))
-                                (ConstClosedStrength (\_,_ => x))
+                                (ConstClosedStrength (\_,_ => x) (\_ => id))
                                 (ExtendMap (const ret))
 ArityStrength (CoProd f)    = CoProdClosedStrength (\a => ArityStrength (f a))
 ArityStrength ([x] :=> ret) = ComposeClosedStrength
@@ -62,3 +74,19 @@ ArityStrength ((x :: y :: xs) :=> ret) =
                                   (ripple (mapIntoAll (\t =>
                                     RestrictClosedStrength (const t)) (x :: y :: xs))))
                                 (ExtendMap (const ret))
+
+public export
+ArityPsh : (a : Arity sort) -> PresheafLifting (arity a)
+ArityPsh (Const ret x) = ComposePsh
+                               (ExtendPsh (const ret))
+                               (ConstPsh (\_,_ => x) (\_ => id))
+ArityPsh ([x] :=> ret) = ComposePsh
+                               (ExtendPsh (const ret))
+                               (RestrictPsh (const x))
+ArityPsh ((x :: y :: xs) :=> ret) =
+                    ComposePsh {g = Extend (const ret)}
+                    (ExtendPsh (const ret))
+                    (AllPsh (ripple
+                      (mapIntoAll (\t => \0 p => RestrictPsh (const t))
+                        (x :: (y :: xs)))))
+ArityPsh (CoProd f) = CoProdPsh (\a => ArityPsh (f a))

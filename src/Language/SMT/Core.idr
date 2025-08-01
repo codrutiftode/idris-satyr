@@ -1,10 +1,5 @@
 module Language.SMT.Core
 
-import Data.DPair
-import Data.List1
-import Data.List
-import Data.Nat
-
 import Language.SMT.Fullfill
 import Language.SMT.Signature
 import Language.SMT.Arity
@@ -14,30 +9,25 @@ import MAST.Substitution
 import MAST.Tensor
 import MAST.Signature
 import MAST.Initiality
+import MAST.Modality
+import MAST.Presheaf
 import MAST.Combinator.List
-
+import MAST.Combinator.Restrict
+import MAST.Combinator.Extend
+import MAST.Combinator.List.Quantifiers
+import MAST.Combinator.CoProd
+import MAST.Combinator.Prod
+import MAST.Combinator.Const
+import MAST.Combinator.Compose
 import MAST.Simple.Core
-import MAST.Simple.Combinator.Either
 import MAST.Simple.Combinator.List.Quantifiers
 
-%hide Data.List.sort
 %hide Builtin.DPair.DPair.(.fst)
 %hide Builtin.DPair.DPair.(.snd)
-
 %hide Data.DPair.Exists.Exists.(.fst)
 %hide Data.DPair.Subset.Subset.(.fst)
 %hide Data.DPair.Exists.Exists.(.snd)
 %hide Data.DPair.Subset.Subset.(.snd)
-
-{-
-Signatures structure:
-
-- quantifiers : forall, exists
-- binders : let, (lambda?)
-* integer arithmetic:
-  - linear / non-linear
-  -
--}
 
 public export
 data TyCore : Type where
@@ -82,24 +72,34 @@ term1 : HomTerm CoreSig (HomFullfill .get TyBool) [<]
 term1 = Op (Eq ** (Op TyBool ** Pack {ty' = ()}
   [Op (ABool ** Pack {ty' = ()} False), Op (ABool ** Pack {ty' = ()} False)]))
 
-data Strings : sorts.SortedFamilyOver bind where
-  Str : String -> Strings s ctx
+CoreSigBoxLift : {f : l |= CoreNeed .ops} -> BoxLift (CoreSig f sys)
+CoreSigBoxLift = PresheafToBoxLift $ CoProdPsh (\x => ArityPsh (labelToArity f x))
 
-{-
-term1 : IO ()
-term1 = let map = (CoreSigMap {f = HomFullfill, sys = HomSorting}).map
-            func : Strings -|> Strings = \case (Str v) => Str (v ++ "!")
-            shed2 = map {p = Strings, q = Strings}
-                    func (Eq ** (Op TyBool ** Pack {ty' = ()} [Str {s = Op TyBool, ctx = [<]} "one", Str {ctx = [<]} "two"]))
-            in case shed2 of (ABool ** t) => putStrLn "fail"
-                             (Not ** t)   => putStrLn "fail"
-                             (And ** t) => putStrLn "fail"
-                             (Eq ** (i ** Pack [Str x, Str y])) => putStrLn x >> putStrLn y
-                             (Or ** t) => putStrLn "fail"
-                             (Xor ** t) => putStrLn "fail"
-                             (Implies ** t) => putStrLn "fail"
-                             (Distinct ** t) => putStrLn "fail"
-                             (Ite ** t) => putStrLn "fail"
+CoreSigPointedStrength : {f : l |= CoreNeed .ops} -> 
+  (CoreSig f sys).PointedClosedStrength
+CoreSigPointedStrength = closedToPointed (CoreSigStrength {f, sys})
+
+substitution : {ty : _ } ->
+  (HomTerm CoreSig) ty ctx ->
+  (HomSorting .fst %| HomTerm CoreSig).subst dtx ctx -> 
+  (HomTerm CoreSig) ty dtx  
+substitution t sub = 
+  (.subst) {o = CoreSig HomFullfill HomSorting}
+    {synAlg = TermAlgebra}
+    {sys = HomSorting}
+    (TermInitial (CoreSigMap {sys = HomSorting})) 
+    (CoreSigMap {sys = HomSorting}) (CoreSigBoxLift {sys = HomSorting}) 
+    (CoreSigPointedStrength {sys = HomSorting}) t dtx sub
+    
+term2 : HomTerm CoreSig (HomFullfill .get TyBool) [<("x" :- Op TyBool)]
+term2 = Op (And ** Pack {ty' = ()} [Op (ABool ** Pack {ty' = ()} False), Var (%% "x")])
+
+testSub : (HomSorting .fst %| HomTerm CoreSig).subst [<] [<("x" :- Op TyBool)]
+testSub ((%%) {pos = Here} "x")   = Op (ABool ** Pack {ty' = ()} True)
+testSub ((%%) {pos = (There y)} x) impossible
+
+test : HomTerm CoreSig (HomFullfill .get TyBool) [<]
+test = substitution term2 testSub
 
 {-
 0
