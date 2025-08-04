@@ -32,7 +32,8 @@ IntNeed = MkSignature
 
 data IntOps = AInt | Neg | Sub | Add | Mul | Div | Mod | Abs | Leq | Geq | Lt | Gt
 
-labelToArity : (f : l |= IntNeed .ops) -> IntOps -> Arity (l.Types)
+labelToArity : {0 sys : SortingSystemOver b s l.Types} ->
+  (f : l |= IntNeed .ops) -> IntOps -> Arity b (l.Types)
 labelToArity f AInt = (Const (f.get (Here TyInt)) Int)
 labelToArity f Neg  = [f.get (Here TyInt)] :=> (f.get (Here TyInt))
 labelToArity f Sub  = [f.get (Here TyInt), f.get (Here TyInt)] :=> (f.get (Here TyInt))
@@ -57,8 +58,8 @@ IntSig f sys = CoProd (arity . labelToArity {f})
 IntSigMap : {f : l |= IntNeed .ops} -> (IntSig f sys).RSortedFamilyFunctor
 IntSigMap = CoProdMap (\x => ArityMap (labelToArity f x))
 
-IntSigStrength : {f : l |= IntNeed .ops} -> (IntSig f sys).ClosedStrength
-IntSigStrength = CoProdClosedStrength (\x => ArityStrength (labelToArity f x))
+IntSigStrength : {f : l |= IntNeed .ops} -> (IntSig f sys).PointedClosedStrength
+IntSigStrength = CoProdPointedClosedStrength (\x => ArityStrength (labelToArity {sys} f x))
 
 term0 : HomTerm IntSig (HomFullfill .get (There (Here TyBool)))
   [<("x" :- Op (Here TyInt))]

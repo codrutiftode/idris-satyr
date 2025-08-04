@@ -43,7 +43,8 @@ CoreNeed = MkSignature
 
 data CoreOps = ABool | Not | Implies | And | Or | Xor | Eq | Distinct | Ite
 
-labelToArity : (f : l |= CoreNeed .ops) -> CoreOps -> Arity (l.Types)
+labelToArity : {0 sys : SortingSystemOver b s l.Types} ->
+  (f : l |= CoreNeed .ops) -> CoreOps -> Arity b (l.Types)
 labelToArity f ABool    = (Const (f.get TyBool) Bool)
 labelToArity f Not      = [f.get TyBool] :=> (f.get TyBool)
 labelToArity f Implies  = [f.get TyBool, f.get TyBool] :=> (f.get TyBool)
@@ -61,8 +62,8 @@ CoreSig f sys = CoProd (arity . labelToArity {f})
 CoreSigMap : {f : l |= CoreNeed .ops} -> (CoreSig f sys).RSortedFamilyFunctor
 CoreSigMap = CoProdMap (\x => ArityMap (labelToArity f x))
 
-CoreSigStrength : {f : l |= CoreNeed .ops} -> (CoreSig f sys).ClosedStrength
-CoreSigStrength = CoProdClosedStrength (\x => ArityStrength (labelToArity f x))
+CoreSigStrength : {f : l |= CoreNeed .ops} -> (CoreSig f sys).PointedClosedStrength
+CoreSigStrength = CoProdPointedClosedStrength (\x => ArityStrength (labelToArity f x))
 
 term0 : HomTerm CoreSig (HomFullfill .get TyBool) [<]
 term0 = Op (And ** Pack {ty' = ()}
@@ -73,24 +74,20 @@ term1 = Op (Eq ** (Op TyBool ** Pack {ty' = ()}
   [Op (ABool ** Pack {ty' = ()} False), Op (ABool ** Pack {ty' = ()} False)]))
 
 CoreSigBoxLift : {f : l |= CoreNeed .ops} -> BoxLift (CoreSig f sys)
-CoreSigBoxLift = PresheafToBoxLift $ CoProdPsh (\x => ArityPsh (labelToArity f x))
-
-CoreSigPointedStrength : {f : l |= CoreNeed .ops} -> 
-  (CoreSig f sys).PointedClosedStrength
-CoreSigPointedStrength = closedToPointed (CoreSigStrength {f, sys})
+CoreSigBoxLift = PresheafToBoxLift $ CoProdPsh (\x => ArityPsh (labelToArity {sys} f x))
 
 substitution : {ty : _ } ->
   (HomTerm CoreSig) ty ctx ->
-  (HomSorting .fst %| HomTerm CoreSig).subst dtx ctx -> 
-  (HomTerm CoreSig) ty dtx  
-substitution t sub = 
+  (HomSorting .fst %| HomTerm CoreSig).subst dtx ctx ->
+  (HomTerm CoreSig) ty dtx
+substitution t sub =
   (.subst) {o = CoreSig HomFullfill HomSorting}
     {synAlg = TermAlgebra}
     {sys = HomSorting}
-    (TermInitial (CoreSigMap {sys = HomSorting})) 
-    (CoreSigMap {sys = HomSorting}) (CoreSigBoxLift {sys = HomSorting}) 
-    (CoreSigPointedStrength {sys = HomSorting}) t dtx sub
-    
+    (TermInitial (CoreSigMap {sys = HomSorting}))
+    (CoreSigMap {sys = HomSorting}) (CoreSigBoxLift {sys = HomSorting})
+    (CoreSigStrength {sys = HomSorting}) t dtx sub
+
 term2 : HomTerm CoreSig (HomFullfill .get TyBool) [<("x" :- Op TyBool)]
 term2 = Op (And ** Pack {ty' = ()} [Op (ABool ** Pack {ty' = ()} False), Var (%% "x")])
 
