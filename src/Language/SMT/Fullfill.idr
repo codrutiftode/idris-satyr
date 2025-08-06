@@ -1,25 +1,30 @@
 module Language.SMT.Fullfill
 
-import MAST.Simple.Core
-import MAST.Simple.Combinator.Either
-import MAST.Simple.Combinator.List.Quantifiers
+import MAST.Sorted.Core
+-- import MAST.Simple.Core
+-- import MAST.Simple.Combinator.Either
+-- import MAST.Simple.Combinator.List.Quantifiers
 
 public export
 infixr 4 |=
 
 public export
-record (|=) (l, r : SimpleSig) where
+record (|=) (l, r : sort.SortedSig) where
   constructor Fullfill
-  alpha : {0 x : Type} -> r x -> l x
+  alpha : {0 x : sort.Fam} -> r x -/> l x
+
+public export
+VoidFam : sort.Fam
+VoidFam = const Void
 
 public export
 -- Note: in general, might want to have a type for variables other than Void
-(.TypesAlgebra) : (0 o : SimpleSig) -> o.algebra
-o.TypesAlgebra = (o.free Void).algebra
+(.TypesAlgebra) : (0 o : sort.SortedSig) -> o.algebra
+o.TypesAlgebra = (o.free VoidFam).algebra
 
 public export
 0
-(.Types) : (o : SimpleSig) -> Type
+(.Types) : (o : sort.SortedSig) -> sort.Fam
 o.Types = o.TypesAlgebra.carrier
 
 public export

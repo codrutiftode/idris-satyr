@@ -6,16 +6,27 @@ import MAST.Signature
 import MAST.Core
 import MAST.Initiality
 
-import MAST.Simple.Core
+import MAST.Sorted.Core
+import Data.List.Quantifiers
+%hide MAST.Core.(.Fam)
 
 public export
 0
-(.Signature) : (need : SimpleSig) -> Type
-need.Signature =
-  {l : SimpleSig} ->
+Finite : (sort : Type) -> Type
+Finite sort = sort.Fam -> Type
+
+public export
+FiniteUnit : Finite ()
+FiniteUnit x = x ()
+
+public export
+0
+(.Signature) : (need : sort.SortedSig) -> (collate : Finite sort) -> Type
+need.Signature collate =
+  {l : sort.SortedSig} ->
   {0 fstSort, sndSort : Type} ->
   (f : (l |= need)) ->
-  (sys : SortingSystemOver fstSort sndSort l.Types) ->  
+  (sys : SortingSystemOver fstSort sndSort (collate l.Types)) ->  
   sys.RSortedFamilyFun
 
 public export
@@ -28,7 +39,8 @@ HomSorting = MkSortingSystemOver
 
 public export
 0
-(.Hom) : (sig : need.Signature) -> (HomSorting {a = need.Types}) .RSortedFamilyFun
+(.Hom) : {collate : Finite sort} -> (sig : need.Signature collate) -> 
+  (HomSorting {a = collate need.Types}) .RSortedFamilyFun
 sig.Hom = sig (Fullfill id) HomSorting
 
 public export
@@ -37,5 +49,6 @@ HomFullfill = Fullfill {alpha = id}
 
 public export
 0
-HomTerm : (sig : need.Signature) -> (need.Types).SortedFamilyOver (need.Types)
-HomTerm sig = Term HomSorting (sig.Hom) Var -- (sig.Hom) Var
+HomTerm : (collate : Finite sort) -> (sig : need.Signature collate) -> 
+  (collate need.Types).SortedFamilyOver (collate need.Types)
+HomTerm collate sig = Term HomSorting (sig.Hom {collate}) Var
