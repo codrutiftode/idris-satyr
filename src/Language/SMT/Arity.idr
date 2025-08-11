@@ -48,6 +48,7 @@ Cast (SnocList (String, b)) b.Ctx where
   cast (xs :< (x, s)) = cast xs :< (x :- s)
 
 ||| A single-sorted non-binding AST node taking sub-terms of the given list of sorts
+public export
 Node : List sort -> (sort, b) ====> ((),b)
 Node [] = Const $ const $ const ()
 Node [x] = (@. x)
