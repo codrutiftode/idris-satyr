@@ -69,16 +69,13 @@ term0 : HomTerm FiniteUnit IntSig (HomFullfill .get (Here TyInt))
 term0 = Op (Add ** Pack {ty' = ()} [Var (%% "x"), Op (AInt ** Pack {ty' = ()} 3)])
 
 IntsRelAlg : RelativeAlgebra _ (IntSig .Hom {collate = FiniteUnit})
-  Var SerialisedCoalg SerialisedPoint Base
+  MVar SerialisedCoalg SerialisedPoint Base
 IntsRelAlg = MkRelativeAlgebra
   { alg = \x => case x of
-        (AInt ** Pack x) => \_ => Str (cast x)
+        (AInt ** Pack x) => \_ => cast x
         (Neg ** snd) => ?huh_2
         (Sub ** snd) => ?huh_3
-        (Add ** (Pack [x, y])) => \ps =>
-             let (Str x') = x ps
-                 (Str y') = y ps
-             in Str (x' ++ "+" ++ y')
+        (Add ** (Pack [x, y])) => \ps => x ps ++ "+" ++ y ps
         (Mul ** snd) => ?huh_5
         (Div ** snd) => ?huh_6
         (Mod ** snd) => ?huh_7
@@ -87,15 +84,15 @@ IntsRelAlg = MkRelativeAlgebra
         (Geq ** snd) => ?huh_10
         (Lt ** snd) => ?huh_11
         (Gt ** snd) => ?huh_12
-  , val = \(x, y) => \ps => let (Str s) = y ps in Str s
-  , menv = ?wut2
+  , val = \v, names => lookup names v
+  , menv = \meta => const (meta.snd.fst)
   }
 
 serialiseInts : HomSorting .Serialiser (HomTerm FiniteUnit IntSig)
 serialiseInts = serialiseTerm IntSigStrength IntSigMap ?aIntsRelAlg
 
 test : {ctx : _} -> {s : _} -> {auto ps : PS ctx} -> HomTerm FiniteUnit IntSig s ctx -> String
-test term = let (Str s) = serialiseInts term ctx SerialisedPoint ps in s
+test term = serialiseInts term ctx SerialisedPoint (setupNames ps)
 
 main : IO ()
 main = putStrLn (test term0)
