@@ -27,8 +27,8 @@ import Data.Singleton
 
 data Kind = KGround | KFun
 
-KFinite : Finite Kind
-KFinite fam = (i : Kind ** fam i)
+KCollate : Collate Kind
+KCollate fam = (i : Kind ** fam i)
 
 TypesSig : Kind .SortedSig
 TypesSig x KGround = ()
@@ -49,29 +49,29 @@ public export
 data FunOps = App
 
 public export
-labelToArity : {sys : SortingSystemOver fstSort sndSort (KFinite l.Types)} ->
-  (f : l |= FunNeed .ops) -> FunOps -> Arity fstSort (KFinite l.Types)
-labelToArity f App = CoProd (\s1 : List (l .term (\value => Void) KGround) =>
+labelToArity : {sys : SortingSystemOver fstSort sndSort (KCollate (l.Types vars))} ->
+  (f : l |= FunNeed .ops) -> FunOps -> Arity fstSort (KCollate (l.Types vars))
+labelToArity f App = CoProd (\s1 : List (l .term vars KGround) =>
                      CoProd (\s2 : _ =>
-                     (KFun ** (f.get (s2, s1))) :: (map (\x => (KGround ** x)) s1) :=>
+                     (KFun ** (f.op (s2, s1))) :: (map (\x => (KGround ** x)) s1) :=>
                      (KGround ** s2)))
 
 public export
 0
-FunSig : (FunNeed .ops) .Signature KFinite
+FunSig : (FunNeed .ops) .Signature KCollate vars
 FunSig f sys = CoProd (arity . labelToArity {sys} f)
 
 public export
-FunSigMap : {sys : SortingSystemOver b s (KFinite l.Types)} ->
+FunSigMap : {sys : SortingSystemOver b s (KCollate (l.Types vars))} ->
   {f : l |= FunNeed .ops} -> (FunSig f sys).RSortedFamilyFunctor
 FunSigMap = CoProdMap (\x => ArityMap (labelToArity {sys} f x))
 
 public export
-FunSigStrength : {sys : SortingSystemOver b s (KFinite l.Types)} ->
+FunSigStrength : {sys : SortingSystemOver b s (KCollate (l.Types vars))} ->
   {f : l |= FunNeed .ops} -> (FunSig f sys).PointedClosedStrength
 FunSigStrength = CoProdPointedClosedStrength (\x => ArityStrength (labelToArity {sys} f x))
 
-term0 : HomTerm KFinite FunSig (KGround ** Op ())
+term0 : HomTerm KCollate NoSortVar FunSig (KGround ** Op ())
   [<("f" :- (KFun ** Op (Op (), [Op ()]))), ("x" :- (KGround ** Op ()))]
 term0 = Op (App ** ([Op ()] ** (_ **
         Pack {ty' = ()} [Var (%% "f"), Var (%% "x")]

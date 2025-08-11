@@ -35,27 +35,27 @@ IntNeed = MkSignature
 
 data IntOps = AInt | Neg | Sub | Add | Mul | Div | Mod | Abs | Leq | Geq | Lt | Gt
 
-labelToArity : {0 sys : SortingSystemOver b s (l.Types ())} ->
-  (f : l |= IntNeed .ops) -> IntOps -> Arity b (l.Types ())
-labelToArity f AInt = (Const (f.get (Here TyInt)) Int)
-labelToArity f Neg  = [f.get (Here TyInt)] :=> (f.get (Here TyInt))
-labelToArity f Sub  = [f.get (Here TyInt), f.get (Here TyInt)] :=> (f.get (Here TyInt))
-labelToArity f Add  = [f.get (Here TyInt), f.get (Here TyInt)] :=> (f.get (Here TyInt))
-labelToArity f Mul  = [f.get (Here TyInt), f.get (Here TyInt)] :=> (f.get (Here TyInt))
-labelToArity f Div  = [f.get (Here TyInt), f.get (Here TyInt)] :=> (f.get (Here TyInt))
-labelToArity f Mod  = [f.get (Here TyInt), f.get (Here TyInt)] :=> (f.get (Here TyInt))
-labelToArity f Abs  = [f.get (Here TyInt)] :=> (f.get (Here TyInt))
+labelToArity : {0 sys : SortingSystemOver b s (SingleKind $ l.Types vars)} ->
+  (f : l |= IntNeed .ops) -> IntOps -> Arity b (SingleKind $ l.Types vars)
+labelToArity f AInt = (Const (f.op (Here TyInt)) Int)
+labelToArity f Neg  = [f.op (Here TyInt)] :=> (f.op (Here TyInt))
+labelToArity f Sub  = [f.op (Here TyInt), f.op (Here TyInt)] :=> (f.op (Here TyInt))
+labelToArity f Add  = [f.op (Here TyInt), f.op (Here TyInt)] :=> (f.op (Here TyInt))
+labelToArity f Mul  = [f.op (Here TyInt), f.op (Here TyInt)] :=> (f.op (Here TyInt))
+labelToArity f Div  = [f.op (Here TyInt), f.op (Here TyInt)] :=> (f.op (Here TyInt))
+labelToArity f Mod  = [f.op (Here TyInt), f.op (Here TyInt)] :=> (f.op (Here TyInt))
+labelToArity f Abs  = [f.op (Here TyInt)] :=> (f.op (Here TyInt))
 labelToArity f Leq  =
-  [f.get (Here TyInt), f.get (Here TyInt)] :=> (f.get (There (Here TyBool)))
+  [f.op (Here TyInt), f.op (Here TyInt)] :=> (f.op (There (Here TyBool)))
 labelToArity f Geq  =
-  [f.get (Here TyInt), f.get (Here TyInt)] :=> (f.get (There (Here TyBool)))
+  [f.op (Here TyInt), f.op (Here TyInt)] :=> (f.op (There (Here TyBool)))
 labelToArity f Lt   =
-  [f.get (Here TyInt), f.get (Here TyInt)] :=> (f.get (There (Here TyBool)))
+  [f.op (Here TyInt), f.op (Here TyInt)] :=> (f.op (There (Here TyBool)))
 labelToArity f Gt   =
-  [f.get (Here TyInt), f.get (Here TyInt)] :=> (f.get (There (Here TyBool)))
+  [f.op (Here TyInt), f.op (Here TyInt)] :=> (f.op (There (Here TyBool)))
 
 0
-IntSig : (IntNeed .ops) .Signature FiniteUnit
+IntSig : (IntNeed .ops) .Signature SingleKind vars
 IntSig f sys = CoProd (arity . labelToArity {f})
 
 IntSigMap : {f : l |= IntNeed .ops} -> (IntSig f sys).RSortedFamilyFunctor
@@ -64,11 +64,11 @@ IntSigMap = CoProdMap (\x => ArityMap (labelToArity f x))
 IntSigStrength : {f : l |= IntNeed .ops} -> (IntSig f sys).PointedClosedStrength
 IntSigStrength = CoProdPointedClosedStrength (\x => ArityStrength (labelToArity {sys} f x))
 
-term0 : HomTerm FiniteUnit IntSig (HomFullfill .get (Here TyInt))
+term0 : HomTerm SingleKind NoSortVar IntSig (SelfFullfill .op (Here TyInt))
   [<("x" :- Op (Here TyInt))]
 term0 = Op (Add ** Pack {ty' = ()} [Var (%% "x"), Op (AInt ** Pack {ty' = ()} 3)])
 
-IntsRelAlg : RelativeAlgebra _ (IntSig .Hom {collate = FiniteUnit})
+IntsRelAlg : RelativeAlgebra _ (IntSig .Hom {collate = SingleKind})
   MVar SerialisedCoalg SerialisedPoint Base
 IntsRelAlg = MkRelativeAlgebra
   { alg = \x => case x of
@@ -88,22 +88,22 @@ IntsRelAlg = MkRelativeAlgebra
   , menv = \meta => const (meta.snd.fst)
   }
 
-serialiseInts : HomSorting .Serialiser (HomTerm FiniteUnit IntSig)
+serialiseInts : HomSorting .Serialiser (HomTerm SingleKind NoSortVar IntSig)
 serialiseInts = serialiseTerm IntSigStrength IntSigMap ?aIntsRelAlg
 
-test : {ctx : _} -> {s : _} -> {auto ps : PS ctx} -> HomTerm FiniteUnit IntSig s ctx -> String
+test : {ctx : _} -> {s : _} -> {auto ps : PS ctx} -> HomTerm SingleKind NoSortVar IntSig s ctx -> String
 test term = serialiseInts term ctx SerialisedPoint (setupNames ps)
 
 main : IO ()
 main = putStrLn (test term0)
 
 {-
-prettyInts : Serialiser HomSorting (HomTerm IntSig FiniteUnit) Var
+prettyInts : Serialiser HomSorting (HomTerm IntSig SingleKind) Var
 prettyInts = ?todo -- pretty IntSigStrength IntsRelAlg IntSigMap
 
-testTerm : HomTerm FiniteUnit IntSig (HomFullfill .get (Here TyInt)) [<]
+testTerm : HomTerm FiniteUnit IntSig (SelfFullfill .op (Here TyInt)) [<]
 testTerm = Op (Add ** Pack {ty' = ()}
   [Op (AInt ** Pack {ty' = ()} 1), Op (AInt ** Pack {ty' = ()} 2)])
 
-test : Strings ((HomFullfill {a = IntNeed .ops}) .get (Here TyInt)) [<]
+test : Strings ((SelfFullfill {a = IntNeed .ops}) .op (Here TyInt)) [<]
 test = let shed = prettyInts testTerm ?wo ?wow in ?rest

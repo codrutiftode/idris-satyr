@@ -31,15 +31,15 @@ public export
 data QuantOps = Forall | Exists
 
 public export
-labelToArity : {0 sys : SortingSystemOver b s (l.Types ())} ->
+labelToArity : {0 sys : SortingSystemOver b s (SingleKind $ l.Types vars)} ->
   (f : l |= CoreNeed .ops) ->
-  QuantOps -> Arity b (l.Types ())
+  QuantOps -> Arity b (SingleKind $ l.Types vars)
 labelToArity f _ =
-  CoProd (\x => CoProd (\a => [([<(x, a)], f.get TyBool)] ::=> f.get TyBool))
+  CoProd (\x => CoProd (\a => [([<(x, a)], f.op TyBool)] ::=> f.op TyBool))
 
 public export
 0
-QuantSig : (CoreNeed .ops) .Signature FiniteUnit
+QuantSig : (CoreNeed .ops) .Signature SingleKind vars
 QuantSig f sys = CoProd (arity . labelToArity {sys} f)
 
 public export
@@ -50,20 +50,21 @@ public export
 QuantSigStrength : {f : l |= CoreNeed .ops} -> (QuantSig f sys).PointedClosedStrength
 QuantSigStrength = CoProdPointedClosedStrength (\x => ArityStrength (labelToArity {sys} f x))
 
-term0 : HomTerm FiniteUnit QuantSig (Op TyBool) [<("x" :- Op TyBool)]
+term0 : HomTerm SingleKind NoSortVar QuantSig (Op TyBool) [<("x" :- Op TyBool)]
 term0 = Op (Forall ** ("y" **
   (Op TyBool ** Pack {ty' = ()} [Var (%% "y")])))
 
-term1 : HomTerm FiniteUnit QuantSig (Op TyBool) [<("x" :- Op TyBool)]
+term1 : HomTerm SingleKind NoSortVar QuantSig (Op TyBool) [<("x" :- Op TyBool)]
 term1 = Op (Forall ** ("x" **
   (Op TyBool ** Pack {ty' = ()} [
     Op (Exists ** ("x" ** (Op TyBool ** Pack {ty' = ()} [Var (Here .toVar)])))
   ])))
 
-term2 : HomTerm FiniteUnit QuantSig (Op TyBool) [<("x" :- Op TyBool), ("x" :- Op TyBool), ("x" :- Op TyBool)]
+term2 : HomTerm SingleKind NoSortVar QuantSig (Op TyBool) [<("x" :- Op TyBool), ("x" :- Op TyBool), ("x" :- Op TyBool)]
 term2 = Var (Here .toVar)
 
-QuantRelAlg : RelativeAlgebra HomSorting (QuantSig .Hom {collate = FiniteUnit})
+QuantRelAlg : RelativeAlgebra HomSorting 
+  (QuantSig .Hom {collate = SingleKind} {vars = NoSortVar})
   MVar SerialisedCoalg SerialisedPoint Base
 QuantRelAlg = MkRelativeAlgebra
   { alg = \case
@@ -77,13 +78,13 @@ QuantRelAlg = MkRelativeAlgebra
   , menv = \meta => const (meta.snd.fst)
   }
 
-serialiseQuant : HomSorting .Serialiser (HomTerm FiniteUnit QuantSig)
+serialiseQuant : HomSorting .Serialiser (HomTerm SingleKind NoSortVar QuantSig)
 serialiseQuant = serialiseTerm
-  (QuantSigStrength {f = HomFullfill, sys = HomSorting})
-  (QuantSigMap {f = HomFullfill, sys = HomSorting})
+  (QuantSigStrength {f = SelfFullfill, sys = HomSorting})
+  (QuantSigMap {f = SelfFullfill, sys = HomSorting})
   QuantRelAlg
 
-test : {ctx : _} -> {s : _} -> {auto ps : PS ctx} -> HomTerm FiniteUnit QuantSig s ctx -> String
+test : {ctx : _} -> {s : _} -> {auto ps : PS ctx} -> HomTerm SingleKind NoSortVar QuantSig s ctx -> String
 test term = serialiseQuant term ctx SerialisedPoint (setupNames ps)
 
 main : IO ()
