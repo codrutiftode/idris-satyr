@@ -27,54 +27,88 @@ infixr 3 :=>, ::=>
 
 public export
 data Arity : Type -> Type -> Type where
+  ||| An AST Leaf tagged by elements of a given set `ret`
   Const   : (ret : sort) -> Type -> Arity b sort
+  ||| Any one node of the given indexed family of nodes
   CoProd  : ((a : arg) -> (Arity b sort)) -> Arity b sort
+  ||| A finitely-branching node of sort `ret` and sub-trees as in `xs`
   (:=>)   : (xs : List sort) ->
             (ret : sort) ->
             Arity b sort
+  ||| A finitely-branching node of sort `ret` and sub-trees as in `as`,
+  ||| each of which may bind some variables of given sorts
   (::=>) : (as : List (SnocList (String, b), sort)) ->
-           {auto _ : NonZero (length as)} ->
-           (ret : sort) -> Arity b sort
+             (ret : sort) -> Arity b sort
 
+-- Why is this here? Should be in MAST.
+-- TODO: upstream to MAST
 public export
-toCtx : SnocList (String, b) -> b.Ctx
-toCtx [<] = [<]
-toCtx (xs :< (x, s)) = toCtx xs :< (x :- s)
+Cast (SnocList (String, b)) b.Ctx where
+  cast [<] = [<]
+  cast (xs :< (x, s)) = cast xs :< (x :- s)
 
+||| A single-sorted non-binding AST node taking sub-terms of the given list of sorts
+Node : List sort -> (sort, b) ====> ((),b)
+Node [] = Const $ const $ const ()
+Node [x] = (@. x)
+Node xs@(x :: y :: _) = All (map (flip (@.)) xs)
+
+
+||| The signature functor of a binding signature
 public export
 0
 arity : Arity b sort -> (sort,b) ====> (sort,b)
 arity (Const ret ty) = ExtendOne ret . Const (\_,_ => ty)
-arity ([] :=> ret)   = ExtendOne ret . Const (\_,_ => ())
-arity ([x] :=> ret)  = ExtendOne ret . (x .@)
-arity (xs  :=> ret)  = ExtendOne ret . All (map (.@) xs)
+arity (xs :=> ret)   = ExtendOne ret . Node xs
 arity (CoProd f)     = CoProd (arity . f)
 arity (as ::=> ret)  =
-  ExtendOne ret . All (map (\t => ((toCtx t.fst).|>) . (t.snd.@)) as)
+  ExtendOne ret . All (map (\t => ((cast t.fst).|>) . (@. t.snd)) as)
 
+-- These Should be in MAST or even better, contrib or All/Any stdlib
 public export
 mapIntoAll : (f : (x : a) -> p x) -> (l : List a) -> All p l
-mapIntoAll f l = mapProperty (\case (Val x) => f x) (remember l)
+mapIntoAll prf xs = mapProperty (\case (Val x) => prf x) (remember xs)
 
+-- This seems to be a useful special case
+public export
+mapIntoComposite :
+  (prf : (x : a) -> (f . g) x) -> (xs : List a) -> All f (map g xs)
+mapIntoComposite prf xs = ripple (mapIntoAll prf xs)
+
+||| The functorial action of the (single-sorted) Node signature functor
+public export
+NodeMap : (xs : List sort) -> (Node xs).RSortedFamilyFunctor
+NodeMap [] = ConstMap (\_,_ => ())
+NodeMap [x] = RestrictMap (const x)
+NodeMap xs@(x :: y :: _) = AllMap $ mapIntoComposite (\t =>
+                            RestrictMap (const t)) xs
+
+||| The functorial action of the signature functor the given binding signature
+||| induces
 public export
 ArityMap : (a : Arity b sort) -> (arity a).RSortedFamilyFunctor
 ArityMap (Const ret x) = (ExtendMap (const ret))
                          `ComposeMap` (ConstMap (\_,_ => x))
 ArityMap (CoProd f) = CoProdMap (\a => ArityMap (f a))
-ArityMap ([] :=> ret) = (ExtendMap (const ret))
-                         `ComposeMap` (ConstMap (\_,_ => ()))
-ArityMap ([x] :=> ret) = (ExtendMap (const ret))
-                         `ComposeMap` (RestrictMap (const x))
-ArityMap ((x :: y :: xs) :=> ret) =
-                         (ExtendMap (const ret))
-                         `ComposeMap` AllMap (ripple (mapIntoAll (\t =>
-                            RestrictMap (const t)) (x :: y :: xs)))
+ArityMap (xs :=> ret) = (ExtendMap (const ret)) `ComposeMap` NodeMap xs
 ArityMap (as ::=> ret) = (ExtendMap (const ret))
                          `ComposeMap`
-                         AllMap (ripple (mapIntoAll (\(vars, subRet) =>
-                           (ShiftMap (toCtx vars))
-                           `ComposeMap` (RestrictMap (const subRet))) as))
+                         AllMap (mapIntoComposite (\(vars, subRet) =>
+                           (ShiftMap (cast vars))
+                           `ComposeMap` (RestrictMap (const subRet))) as)
 
+||| The tensorial strength of the (single-sorted) Node signature functor
+public export
+NodeStrength : (xs : List sort) -> (Node xs).PointedClosedStrength
+NodeStrength [] = ConstPointedClosedStrength (const $ const ()) (\_,_ => id)
+NodeStrength [x] = RestrictPointedClosedStrength (const x)
+NodeStrength xs@(_ :: _ :: _) = AllPointedClosedStrength
+                              $ mapIntoComposite (\t =>
+                                RestrictPointedClosedStrength (const t)) xs
+
+
+||| The tensorial strength of the signature functor the given binding signature
+||| induces
 public export
 ArityStrength : (a : Arity b sort) -> (arity a).PointedClosedStrength
 ArityStrength (CoProd f)    = CoProdPointedClosedStrength (\a => ArityStrength (f a))
@@ -82,53 +116,45 @@ ArityStrength (Const ret x) = ComposePointedClosedStrength
                                 (ExtendPointedClosedStrength (const ret))
                                 (ConstPointedClosedStrength (\_,_ => x) (\_,_ => id))
                                 (ExtendMap (const ret))
-ArityStrength ([] :=> ret) = ComposePointedClosedStrength
+ArityStrength (xs :=> ret) = ComposePointedClosedStrength
                                 (ExtendPointedClosedStrength (const ret))
-                                (ConstPointedClosedStrength (\_,_ => ()) (\_,_ => id))
+                                (NodeStrength xs)
                                 (ExtendMap (const ret))
-ArityStrength ([x] :=> ret) = ComposePointedClosedStrength
-                                (ExtendPointedClosedStrength (const ret))
-                                (RestrictPointedClosedStrength (const x))
-                                (ExtendMap (const ret))
-ArityStrength ((x :: y :: xs) :=> ret) =
-                          ComposePointedClosedStrength
-                            (ExtendPointedClosedStrength (const ret))
-                            (AllPointedClosedStrength
-                             (ripple (mapIntoAll (\t =>
-                              RestrictPointedClosedStrength (const t)) (x :: y :: xs))))
-                              (ExtendMap (const ret))
 ArityStrength (as ::=> ret) = ComposePointedClosedStrength
                                 (ExtendPointedClosedStrength (const ret))
                                 (AllPointedClosedStrength
-                                  (ripple (mapIntoAll (\(vars, subRet) =>
+                                  (mapIntoComposite (\(vars, subRet) =>
                                     ComposePointedClosedStrength
-                                      (ShiftPointedClosedStrength (toCtx vars))
+                                      (ShiftPointedClosedStrength (cast vars))
                                       (RestrictPointedClosedStrength (const subRet))
-                                      (ShiftMap (toCtx vars))) as)))
+                                      (ShiftMap (cast vars))) as))
                                 (ExtendMap (const ret))
 
+||| Lifting of presheaf structure from input sub-term presheaf to
+||| Node signature output presheaf
+public export
+NodePsh : (xs : List sort) -> PresheafLifting (Node xs)
+NodePsh [] = ConstPsh (const $ const ()) (\_ => id)
+NodePsh [x] = RestrictPsh (const x)
+NodePsh xs@(_ :: _ :: _) = AllPsh
+                         $ mapIntoComposite
+                         (\t => RestrictPsh (const t)) xs
+
+||| Lifting of presheaf structure from input sub-term presheaf to
+||| signature output presheaf
 public export
 ArityPsh : (a : Arity b sort) -> PresheafLifting (arity a)
 ArityPsh (Const ret x) = ComposePsh
                                (ExtendPsh (const ret))
                                (ConstPsh (\_,_ => x) (\_ => id))
-ArityPsh ([] :=> ret) = ComposePsh
+ArityPsh (xs :=> ret) = ComposePsh
                                (ExtendPsh (const ret))
-                               (ConstPsh (\_,_ => ()) (\_ => id))
-ArityPsh ([x] :=> ret) = ComposePsh
-                               (ExtendPsh (const ret))
-                               (RestrictPsh (const x))
-ArityPsh ((x :: y :: xs) :=> ret) =
-                    ComposePsh
-                    (ExtendPsh (const ret))
-                    (AllPsh (ripple
-                      (mapIntoAll (\t => \0 p => RestrictPsh (const t))
-                        (x :: (y :: xs)))))
+                               (NodePsh xs)
 ArityPsh (CoProd f) = CoProdPsh (\a => ArityPsh (f a))
 ArityPsh (as ::=> ret) = ComposePsh
                            (ExtendPsh (const ret))
-                           (AllPsh (ripple {g = (\t => ((toCtx t.fst).|>) . (t.snd.@))}
+                           (AllPsh (ripple {g = (\t => ((cast t.fst).|>) . (@. t.snd))}
                              (mapIntoAll (\(vars, subRet) =>
                                ComposePsh
-                                 (ShiftPsh (toCtx vars))
+                                 (ShiftPsh (cast vars))
                                  (RestrictPsh (const subRet))) as)))

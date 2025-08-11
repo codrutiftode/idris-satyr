@@ -69,3 +69,4 @@ repl.rlwrap = false
 type   = "github"
 url    = "git@github.com:ohad/idris-mast"
 commit = "fetch-latest:mast-refactor"
+ipkg = "mast.ipkg"
