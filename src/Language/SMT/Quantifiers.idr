@@ -48,22 +48,31 @@ public export
 QuantSigStrength : {f : l |= CoreNeed .ops} -> (QuantSig f sys).PointedClosedStrength
 QuantSigStrength = CoProdPointedClosedStrength (\x => ArityStrength (labelToArity {sys} f x))
 
-term0 : HomTerm FiniteUnit QuantSig (HomFullfill .get TyBool) [<("x" :- HomFullfill .get TyBool)]
-term0 = Op (Forall ** ("y" ** 
-  (HomFullfill .get TyBool ** Pack {ty' = ()} [Var (?helpo)]))) 
-  -- Op (Forall ** ("y" ** (Op TyBool ** Pack {ty' = ()} [Var (%% "x")])))
+term0 : HomTerm FiniteUnit QuantSig (Op TyBool) [<("x" :- Op TyBool)]
+term0 = Op (Forall ** ("y" **
+  (Op TyBool ** Pack {ty' = ()} [Var (%% "y")])))
+
+term1 : HomTerm FiniteUnit QuantSig (Op TyBool) [<("x" :- Op TyBool)]
+term1 = Op (Forall ** ("y" **
+  (Op TyBool ** Pack {ty' = ()} [
+    Op (Exists ** ("x" ** (Op TyBool ** Pack {ty' = ()} [Var (Here .toVar)])))
+  ])))
+
+term2 : HomTerm FiniteUnit QuantSig (Op TyBool) [<("x_2" :- Op TyBool), ("x" :- Op TyBool), ("x" :- Op TyBool)]
+term2 = Var ((Here).toVar)
 
 QuantRelAlg : RelativeAlgebra HomSorting (QuantSig .Hom {collate = FiniteUnit})
   Var SerialisedCoalg SerialisedPoint Base
 QuantRelAlg = MkRelativeAlgebra
-  { alg = \x => case x of
-      (Forall ** (name ** (ty ** Pack [body]))) => \ps =>
-        let Str bodyStr = body (S ps)
-            shed = ?helpoo
-        in Str $ "forall " ++ name ++ ". " ++ bodyStr
-      (Exists ** snd) => ?hope_2
-  , val = \(x, y) => \ps => ?hope
-  , menv = ?wut2
+  { alg = \case
+      (Forall ** (name ** (ty ** Pack [body]))) => \names =>
+        let mangled = mangle name names
+        in Str "forall \{mangled.fst}. \{(body (S mangled names)).str}"
+      (Exists ** (name ** (ty ** Pack [body]))) => \names =>
+        let mangled = mangle name names
+        in Str "exists \{mangled.fst}. \{(body (S mangled names)).str}"
+  , val = \v, names => lookup names v
+  , menv = \sth => \arg => ?wut2_1
   }
 
 serialiseQuant : HomSorting .Serialiser (HomTerm FiniteUnit QuantSig)
@@ -73,7 +82,7 @@ serialiseQuant = serialiseTerm
   QuantRelAlg
 
 test : {ctx : _} -> {s : _} -> {auto ps : PS ctx} -> HomTerm FiniteUnit QuantSig s ctx -> String
-test term = let (Str s) = serialiseQuant term ctx SerialisedPoint ps in s
+test term = (serialiseQuant term ctx SerialisedPoint (setupNames ps)).str
 
 main : IO ()
 main = putStrLn (test term0)
