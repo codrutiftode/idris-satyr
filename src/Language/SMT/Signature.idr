@@ -48,7 +48,15 @@ HomFullfill : a |= a
 HomFullfill = Fullfill {alpha = id}
 
 public export
+Strings : sort.SortedFamilyOver b
+Strings s ctx = String
+
+public export
+MVar : sort.SortedFamilyOver bindable
+MVar = Strings
+
+public export
 0
-HomTerm : (collate : Finite sort) -> (sig : need.Signature collate) -> 
+HomTerm : (collate : Finite sort) -> (sig : need.Signature collate) ->
   (collate need.Types).SortedFamilyOver (collate need.Types)
-HomTerm collate sig = Term HomSorting (sig.Hom {collate}) Var
+HomTerm collate sig = Term HomSorting (sig.Hom {collate}) MVar

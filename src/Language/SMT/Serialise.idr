@@ -1,5 +1,7 @@
 module Language.SMT.Serialise
 
+import Language.SMT.Signature
+
 import MAST.Core
 import MAST.Substitution
 import MAST.Tensor
@@ -8,17 +10,8 @@ import MAST.Signature
 import MAST.Initiality
 import Data.String
 import Data.List1
-import Debug.Trace
 
 %hide Data.List.sort
-
-public export
-data Strings : sort.SortedFamilyOver b where
-  Str : String -> Strings s ctx
-
-public export
-(.str) : Strings s ctx -> String
-(Str s).str = s
 
 public export
 Name : Type
@@ -60,18 +53,19 @@ public export
 setupNames : PS ctx -> Names ctx
 setupNames = mangleGlobal . cast
 
+-- TODO: should move to MAST
 public export
 toSubst : (0 p : sort.SortedFamilyOver b) -> p.substNamed ctx dtx -> p.subst ctx dtx
 toSubst _ f x = f x.pos
 
 public export
 lookupNamed : (ps : Names ctx) -> Strings .substNamed ctx ctx
-lookupNamed (S n _) Here = Str (mangleSchema n)
-lookupNamed (S _ ps) (There v) = let (Str s) = lookupNamed ps v in Str s
+lookupNamed (S n _) Here = (mangleSchema n)
+lookupNamed (S _ ps) (There v) = lookupNamed ps v
 
 public export
 lookup : (ps : Names ctx) -> Strings .subst ctx ctx
-lookup ps = toSubst Strings (lookupNamed ps)
+lookup ps = toSubst {ctx} Strings (lookupNamed ps)
 
 public export
 Serialised : sort.SortedFamilyOver sort

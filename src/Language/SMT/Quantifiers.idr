@@ -1,5 +1,7 @@
 module Language.SMT.Quantifiers
 
+import Debug.Trace
+
 import Language.SMT.Signature
 import Language.SMT.Fullfill
 import Language.SMT.Arity
@@ -53,26 +55,26 @@ term0 = Op (Forall ** ("y" **
   (Op TyBool ** Pack {ty' = ()} [Var (%% "y")])))
 
 term1 : HomTerm FiniteUnit QuantSig (Op TyBool) [<("x" :- Op TyBool)]
-term1 = Op (Forall ** ("y" **
+term1 = Op (Forall ** ("x" **
   (Op TyBool ** Pack {ty' = ()} [
     Op (Exists ** ("x" ** (Op TyBool ** Pack {ty' = ()} [Var (Here .toVar)])))
   ])))
 
-term2 : HomTerm FiniteUnit QuantSig (Op TyBool) [<("x_2" :- Op TyBool), ("x" :- Op TyBool), ("x" :- Op TyBool)]
-term2 = Var ((Here).toVar)
+term2 : HomTerm FiniteUnit QuantSig (Op TyBool) [<("x" :- Op TyBool), ("x" :- Op TyBool), ("x" :- Op TyBool)]
+term2 = Var (Here .toVar)
 
 QuantRelAlg : RelativeAlgebra HomSorting (QuantSig .Hom {collate = FiniteUnit})
-  Var SerialisedCoalg SerialisedPoint Base
+  MVar SerialisedCoalg SerialisedPoint Base
 QuantRelAlg = MkRelativeAlgebra
   { alg = \case
       (Forall ** (name ** (ty ** Pack [body]))) => \names =>
         let mangled = mangle name names
-        in Str "forall \{mangled.fst}. \{(body (S mangled names)).str}"
+        in "(forall \{mangleSchema mangled} \{body (S mangled names)})"
       (Exists ** (name ** (ty ** Pack [body]))) => \names =>
         let mangled = mangle name names
-        in Str "exists \{mangled.fst}. \{(body (S mangled names)).str}"
+        in "(exists \{mangleSchema mangled} \{body (S mangled names)})"
   , val = \v, names => lookup names v
-  , menv = \sth => \arg => ?wut2_1
+  , menv = \meta => const (meta.snd.fst)
   }
 
 serialiseQuant : HomSorting .Serialiser (HomTerm FiniteUnit QuantSig)
@@ -82,7 +84,7 @@ serialiseQuant = serialiseTerm
   QuantRelAlg
 
 test : {ctx : _} -> {s : _} -> {auto ps : PS ctx} -> HomTerm FiniteUnit QuantSig s ctx -> String
-test term = (serialiseQuant term ctx SerialisedPoint (setupNames ps)).str
+test term = serialiseQuant term ctx SerialisedPoint (setupNames ps)
 
 main : IO ()
 main = putStrLn (test term0)
