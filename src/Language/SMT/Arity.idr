@@ -1,3 +1,4 @@
+||| Binding signatures and their interpretation as binding signature functors.
 module Language.SMT.Arity
 
 import public Data.Nat
