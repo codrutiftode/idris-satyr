@@ -1,3 +1,4 @@
+|||
 module Language.SMT.Signature
 
 import Language.SMT.Fullfill
@@ -8,9 +9,10 @@ import MAST.Initiality
 
 import MAST.Sorted.Core
 import Data.List.Quantifiers
-%hide MAST.Core.(.Fam)
+%hide MAST.Core.(.Fam) -- Maybe we ought to rename MAST.Sorted.Core.(.SimpleFam)
+  -- TODO: Upstream this ^ comment to MAST.
 
-||| Collate all the types in the family into one
+||| Collate all the families types in the family into one
 public export
 0
 Collate : (sort : Type) -> Type
