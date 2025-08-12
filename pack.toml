@@ -70,3 +70,9 @@ type   = "github"
 url    = "git@github.com:ohad/idris-mast"
 commit = "fetch-latest:mast-refactor"
 ipkg = "mast.ipkg"
+
+[custom.all.flap]
+type   = "github"
+url    = "git@github.com:yellowsquid/idris-flap.git"
+commit = "fetch-latest:master"
+ipkg = "flap.ipkg"
