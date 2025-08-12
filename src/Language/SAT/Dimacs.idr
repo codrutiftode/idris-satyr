@@ -6,7 +6,7 @@ import Data.List
 import Data.List.Quantifiers
 import System
 import System.File
-import System.Random
+-- import System.Random
 import System.File.Process
 
 public export
