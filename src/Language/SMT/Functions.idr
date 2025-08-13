@@ -25,52 +25,40 @@ import MAST.Sorted.Core
 import Data.List.Quantifiers
 import Data.Singleton
 
-data Kind = KGround | KFun
-
-KCollate : Collate Kind
-KCollate fam = (i : Kind ** fam i)
-
-TypesSig : Kind .SortedSig
-TypesSig x KGround = ()
-TypesSig x KFun = (x KGround, List (x KGround))
-
-MapTypesSig : Map TypesSig
-MapTypesSig {s = KGround} _ = id
-MapTypesSig {s = KFun}    f = bimap f (map f)
-
-public export
-FunNeed : Signature Kind
-FunNeed = MkSignature
-  { ops = TypesSig
-  , map = MapTypesSig
-  }
-
 public export
 data FunOps = App
 
 public export
-labelToArity : {sys : SortingSystemOver fstSort sndSort (KCollate (l.Types vars))} ->
-  (f : l |= FunNeed .ops) -> FunOps -> Arity fstSort (KCollate (l.Types vars))
-labelToArity f App = CoProd (\s1 : List (l .term vars KGround) =>
-                     CoProd (\s2 : _ =>
-                     (KFun ** (f.op (s2, s1))) :: (map (\x => (KGround ** x)) s1) :=>
-                     (KGround ** s2)))
+record (.Requirement) (sort : Type) where
+  constructor MkRequirement
+  arg : List sort
+  fun, ret : sort
+
+public export
+labelToArity : {sys : SortingSystemOver fstSort sndSort sort} ->
+  sort.Requirement -> FunOps -> Arity fstSort sort
+labelToArity r App = r.fun :: r.arg :=> r.ret
 
 public export
 0
-FunSig : (FunNeed .ops) .Signature KCollate vars
-FunSig f sys = CoProd (arity . labelToArity {sys} f)
+FunSig : (sys : SortingSystemOver fstSort sndSort sort) ->
+  sort.Requirement -> sys.RSortedFamilyFun
+FunSig sys r = CoProd (arity . labelToArity {sys} r)
 
 public export
-FunSigMap : {sys : SortingSystemOver b s (KCollate (l.Types vars))} ->
-  {f : l |= FunNeed .ops} -> (FunSig f sys).RSortedFamilyFunctor
-FunSigMap = CoProdMap (\x => ArityMap (labelToArity {sys} f x))
+FunSigMap : {sys : SortingSystemOver b s sort} ->
+  (r : sort.Requirement) ->
+  (FunSig sys r).RSortedFamilyFunctor
+FunSigMap r = CoProdMap (\x => ArityMap (labelToArity {sys} r x))
 
 public export
-FunSigStrength : {sys : SortingSystemOver b s (KCollate (l.Types vars))} ->
-  {f : l |= FunNeed .ops} -> (FunSig f sys).PointedClosedStrength
-FunSigStrength = CoProdPointedClosedStrength (\x => ArityStrength (labelToArity {sys} f x))
+FunSigStrength : {sys : SortingSystemOver b s sort} ->
+  (r : sort.Requirement) ->
+  (FunSig sys r).PointedClosedStrength
+FunSigStrength r =
+  CoProdPointedClosedStrength (\x => ArityStrength (labelToArity {sys} r x))
 
+{-
 term0 : HomTerm KCollate NoSortVar FunSig (KGround ** Op ())
   [<("f" :- (KFun ** Op (Op (), [Op ()]))), ("x" :- (KGround ** Op ()))]
 term0 = Op (App ** ([Op ()] ** (_ **
