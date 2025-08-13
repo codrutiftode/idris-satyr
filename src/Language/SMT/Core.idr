@@ -31,43 +31,40 @@ import MAST.Sorted.Core
 %hide Data.DPair.Subset.Subset.(.snd)
 %hide MAST.Core.(.Fam)
 
-public export
-data TyCore : Type where
-  TyBool : TyCore
-
-public export
-CoreNeed : Signature ()
-CoreNeed = MkSignature
-  { ops = \x => \_ => TyCore
-  , map = \_ => \case
-      TyBool => TyBool
-  }
-
 data CoreOps = ABool | Not | Implies | And | Or | Xor | Eq | Distinct | Ite
 
-labelToArity : {0 sys : SortingSystemOver b s (SingleKind $ l.Types vars)} ->
-  (f : l |= CoreNeed .ops) ->
-  CoreOps -> Arity b (l.Types vars ())
-labelToArity f ABool    = (Const (f.op TyBool) Bool)
-labelToArity f Not      = [f.op TyBool] :=> (f.op TyBool)
-labelToArity f Implies  = [f.op TyBool, f.op TyBool] :=> (f.op TyBool)
-labelToArity f And      = [f.op TyBool, f.op TyBool] :=> (f.op TyBool)
-labelToArity f Or       = [f.op TyBool, f.op TyBool] :=> (f.op TyBool)
-labelToArity f Xor      = [f.op TyBool, f.op TyBool] :=> (f.op TyBool)
-labelToArity f Eq       = CoProd (\a => [a, a] :=> (f.op TyBool))
-labelToArity f Distinct = CoProd (\a => [a, a] :=> (f.op TyBool))
-labelToArity f Ite      = CoProd (\a => [f.op TyBool, a, a] :=> a)
+public export
+record CoreReq (sort : Type) where
+  constructor CoreFulfill
+  bool : sort
+
+labelToArity : {0 sys : SortingSystemOver b s sort} ->
+  CoreReq sort -> CoreOps -> Arity b sort
+labelToArity r ABool    = (Const r.bool Bool)
+labelToArity r Not      = [r.bool] :=> r.bool
+labelToArity r Implies  = [r.bool, r.bool] :=> (r.bool)
+labelToArity r And      = [r.bool, r.bool] :=> (r.bool)
+labelToArity r Or       = [r.bool, r.bool] :=> (r.bool)
+labelToArity r Xor      = [r.bool, r.bool] :=> (r.bool)
+labelToArity r Eq       = CoProd (\a => [a, a] :=> (r.bool))
+labelToArity r Distinct = CoProd (\a => [a, a] :=> (r.bool))
+labelToArity r Ite      = CoProd (\a => [r.bool, a, a] :=> a)
 
 0
-CoreSig : (CoreNeed .ops) .Signature SingleKind vars
-CoreSig f sys = CoProd (arity . labelToArity {f, sys})
+CoreSig : CoreReq .Signature
+CoreSig sys r = CoProd (arity . labelToArity {sys} r)
 
-CoreSigMap : {f : l |= CoreNeed .ops} -> (CoreSig f sys).RSortedFamilyFunctor
-CoreSigMap = CoProdMap (\x => ArityMap (labelToArity f x))
+CoreSigMap : (r : CoreReq sys.Sort) -> (CoreSig sys r).RSortedFamilyFunctor
+CoreSigMap r = CoProdMap (\x => ArityMap (labelToArity r x))
 
-CoreSigStrength : {f : l |= CoreNeed .ops} -> (CoreSig f sys).PointedClosedStrength
-CoreSigStrength = CoProdPointedClosedStrength (\x => ArityStrength (labelToArity f x))
+CoreSigStrength : (r : CoreReq sys.Sort) -> (CoreSig sys r).PointedClosedStrength
+CoreSigStrength r = CoProdPointedClosedStrength (\x => ArityStrength (labelToArity r x))
 
+CoreSigBoxLift : (r : CoreReq sys.Sort) -> BoxLift (CoreSig sys r)
+CoreSigBoxLift r = PresheafToBoxLift $
+  CoProdPsh (\x => ArityPsh (labelToArity {sys} r x))
+
+{-
 term0 : HomTerm SingleKind NoSortVar CoreSig (Op TyBool) [<]
 term0 = Op (And ** Pack {ty' = ()}
   [Op (ABool ** Pack {ty' = ()} False), Op (ABool ** Pack {ty' = ()} False)])
@@ -75,10 +72,9 @@ term0 = Op (And ** Pack {ty' = ()}
 term1 : HomTerm SingleKind NoSortVar CoreSig (Op TyBool) [<]
 term1 = Op (Eq ** (Op TyBool ** Pack {ty' = ()}
   [Op (ABool ** Pack {ty' = ()} False), Op (ABool ** Pack {ty' = ()} False)]))
+-}
 
-CoreSigBoxLift : {f : l |= CoreNeed .ops} -> BoxLift (CoreSig f sys)
-CoreSigBoxLift = PresheafToBoxLift $ CoProdPsh (\x => ArityPsh (labelToArity {sys} f x))
-
+{-
 substitution : {ty : _ } ->
   (HomTerm SingleKind NoSortVar CoreSig) ty ctx ->
   (HomSorting .fst %| HomTerm SingleKind NoSortVar CoreSig).subst dtx ctx ->
