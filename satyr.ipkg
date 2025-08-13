@@ -14,7 +14,7 @@ authors = "Ohad Kammar"
 
 -- packages to add to search path
 depends
-  = contrib, mast
+  = mast, flap
 
 -- modules to install
 modules
