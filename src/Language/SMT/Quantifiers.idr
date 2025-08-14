@@ -34,7 +34,7 @@ labelToArity : {0 sys : SortingSystemOver b s sort} ->
   (r : CoreReq sort) ->
   QuantOps -> Arity b sort
 labelToArity r _ =
-  CoProd (\x => CoProd (\a => [([<(x, a)], r.bool)] ::=> r.bool))
+  CoProd (\x => CoProd (\a : b => [([<(x, a)], r.bool)] ::=> r.bool))
 
 public export
 0
@@ -49,34 +49,27 @@ public export
 QuantSigStrength : (r : CoreReq sys.Sort) -> (QuantSig sys r).PointedClosedStrength
 QuantSigStrength r = CoProdPointedClosedStrength (\x => ArityStrength (labelToArity {sys} r x))
 
-QuantRelAlg : RelativeAlgebra (HomSorting sort)
-  (QuantSig (HomSorting sort) r)
-  MVar SerialisedCoalg SerialisedPoint Base
-QuantRelAlg = MkRelativeAlgebra
-  { alg = \case
-      (Forall ** (name ** (ty ** Pack [body]))) => \names =>
-        let mangled = mangle name names
-        in "(forall "
-            ++ mangleSchema mangled
-            ++ " "
-            ++ body (S mangled names)
-            ++ ")"
-      (Exists ** (name ** (ty ** Pack [body]))) => \names =>
-        let mangled = mangle name names
-        in "(exists "
-            ++ mangleSchema mangled
-            ++ " "
-            ++ body (S mangled names)
-            ++ ")"
-  , val = \v, names => lookup names v
-  , menv = \meta => const (meta.snd.fst)
-  }
+public export
+QuantSigSerialise : (QuantSig sys r) SerialiseTarget -|> SerialiseTarget
+QuantSigSerialise (Forall ** (name ** (ty ** Pack [body]))) names =
+     let mangled = mangle name names
+     in "(forall "
+         ++ mangleSchema mangled
+         ++ " "
+         ++ body (S mangled names)
+         ++ ")"
+QuantSigSerialise (Exists ** (name ** (ty ** Pack [body]))) names =
+    let mangled = mangle name names
+    in "(exists "
+        ++ mangleSchema mangled
+        ++ " "
+        ++ body (S mangled names)
+        ++ ")"
 
 serialiseQuant : (r : CoreReq sort) -> (HomSorting sort) .Serialiser (HomTerm QuantSig r)
-serialiseQuant r = serialiseTerm
+serialiseQuant r = serialiser (QuantSigSerialise {sys = HomSorting sort})
   (QuantSigStrength {r, sys = HomSorting sort})
   (QuantSigMap {r, sys = HomSorting sort})
-  QuantRelAlg
 
 data TheSorts : Type where
   BoolS : TheSorts

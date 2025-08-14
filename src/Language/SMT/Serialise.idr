@@ -80,19 +80,19 @@ SerialisedPoint : Point Serialised
 SerialisedPoint = id
 
 public export
-Base : sort.SortedFamilyOver b
-Base s ctx = Names ctx -> Strings s ctx
+SerialiseTarget : sort.SortedFamilyOver b
+SerialiseTarget s ctx = Names ctx -> Strings s ctx
 
 public export
 0
 (.Serialiser) : (0 sys : SortingSystemOver fstSort sndSort sort) -> (syn : sys.RSortedFamily) -> Type
-sys.Serialiser syn = syn -|> (Base <-# Serialised)
+sys.Serialiser syn = syn -|> (SerialiseTarget <-# Serialised)
 
 public export
 serialise : (synAlg : Algebra sys o mvar syn) ->
   (fold : FamInitial sys synAlg) ->
   (strength : o.PointedClosedStrength) ->
-  RelativeAlgebra sys o mvar SerialisedCoalg SerialisedPoint Base ->
+  RelativeAlgebra sys o mvar SerialisedCoalg SerialisedPoint SerialiseTarget ->
   sys.Serialiser syn
 serialise synAlg fold strength relAlg = fold .traverse
   { synAlg = synAlg,
@@ -104,7 +104,25 @@ serialiseTerm :
   {sys : SortingSystemOver fstSort sndSort sort} ->
   (strength : o.PointedClosedStrength) ->
   o.RSortedFamilyFunctor ->
-  RelativeAlgebra sys o mvar SerialisedCoalg SerialisedPoint Base ->
+  RelativeAlgebra sys o mvar SerialisedCoalg SerialisedPoint SerialiseTarget ->
   sys.Serialiser (Term sys o mvar)
 serialiseTerm strength oMap relAlg =
   serialise TermAlgebra (TermInitial oMap) strength relAlg
+
+makeRelativeAlgebra :  (alg : o SerialiseTarget -|> SerialiseTarget) ->
+  RelativeAlgebra sys o MVar SerialisedCoalg SerialisedPoint SerialiseTarget
+makeRelativeAlgebra alg = MkRelativeAlgebra
+  { alg
+  , val = \v, names => lookup names v
+  , menv = \meta => const (meta.snd.fst)
+  }
+
+-- TODO: refactor the names of serialising functions
+public export
+serialiser : {sys : SortingSystemOver fstSort sndSort sort} ->
+  (alg : o SerialiseTarget -|> SerialiseTarget) ->
+  (strength : o.PointedClosedStrength) ->
+  o.RSortedFamilyFunctor ->
+  sys.Serialiser (Term sys o MVar)
+serialiser alg strength oMap =
+  serialise TermAlgebra (TermInitial oMap) strength (makeRelativeAlgebra alg)
