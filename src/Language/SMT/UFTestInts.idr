@@ -29,7 +29,7 @@ import MAST.Simple.Core
 data UFTestIntsOps = Fun | Ints
 
 data GroundSort : Type where
-  IntS : GroundSort
+  IntS, BoolS : GroundSort
 
 0
 FunSortsSig : SimpleSig
@@ -43,34 +43,40 @@ FunSort = FunSortsSig GroundSort
 OurSort : Type
 OurSort = Either GroundSort FunSort
 
-Fulfillment : List GroundSort -> GroundSort -> OurSort .Requirement
-Fulfillment a b = (MkRequirement
+FunFulfillment : List GroundSort -> GroundSort -> FunReq OurSort
+FunFulfillment a b = (FunFulfill
              { arg = map Left a
              , ret = Left b
              , fun = Right (b, a)
              })
+
+IntsFulfillment : IntsReq OurSort
+IntsFulfillment = IntsFulfill
+  { int = Left IntS
+  , bool = Left BoolS
+  }
 
 0
 UFTestInts : (HomSorting {a = OurSort}).RSortedFamilyFun
 UFTestInts = CoProd (\case
   Fun => CoProd (\a : List GroundSort =>
          CoProd (\b : GroundSort =>
-         FunSig (HomSorting {a = OurSort}) (Fulfillment a b)))
-  Ints => TestIntsSig (HomSorting {a = OurSort}) (Left IntS))
+         FunSig (HomSorting {a = OurSort}) (FunFulfillment a b)))
+  Ints => TestIntsSig (HomSorting {a = OurSort}) IntsFulfillment)
 
 UFTestIntsMap : UFTestInts .RSortedFamilyFunctor
 UFTestIntsMap = CoProdMap (\case
   Fun => CoProdMap (\a =>
          CoProdMap (\b =>
-         FunSigMap (Fulfillment a b)))
-  Ints => TestIntsSigMap (Left IntS))
+         FunSigMap (FunFulfillment a b)))
+  Ints => TestIntsSigMap (IntsFulfillment))
 
 UFTestIntsStrength : UFTestInts .PointedClosedStrength
 UFTestIntsStrength = CoProdPointedClosedStrength (\case
   Fun => CoProdPointedClosedStrength (\a =>
          CoProdPointedClosedStrength (\b =>
-         FunSigStrength (Fulfillment a b)))
-  Ints => TestIntsPointedClosedStrength (Left IntS))
+         FunSigStrength (FunFulfillment a b)))
+  Ints => TestIntsPointedClosedStrength (IntsFulfillment))
 
 UFTestIntsTerm : Term (HomSorting {a = OurSort}) UFTestInts MVar (Left IntS)
   [<("f" :- Right (IntS, [IntS])), ("y" :- Left IntS)]

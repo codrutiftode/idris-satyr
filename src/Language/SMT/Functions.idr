@@ -29,31 +29,31 @@ public export
 data FunOps = App
 
 public export
-record (.Requirement) (sort : Type) where
-  constructor MkRequirement
+record FunReq (sort : Type) where
+  constructor FunFulfill
   arg : List sort
   fun, ret : sort
 
 public export
 labelToArity : {sys : SortingSystemOver fstSort sndSort sort} ->
-  sort.Requirement -> FunOps -> Arity fstSort sort
+  FunReq sort -> FunOps -> Arity fstSort sort
 labelToArity r App = r.fun :: r.arg :=> r.ret
 
 public export
 0
 FunSig : (sys : SortingSystemOver fstSort sndSort sort) ->
-  sort.Requirement -> sys.RSortedFamilyFun
+  FunReq sort -> sys.RSortedFamilyFun
 FunSig sys r = CoProd (arity . labelToArity {sys} r)
 
 public export
 FunSigMap : {sys : SortingSystemOver b s sort} ->
-  (r : sort.Requirement) ->
+  (r : FunReq sort) ->
   (FunSig sys r).RSortedFamilyFunctor
 FunSigMap r = CoProdMap (\x => ArityMap (labelToArity {sys} r x))
 
 public export
 FunSigStrength : {sys : SortingSystemOver b s sort} ->
-  (r : sort.Requirement) ->
+  (r : FunReq sort) ->
   (FunSig sys r).PointedClosedStrength
 FunSigStrength r =
   CoProdPointedClosedStrength (\x => ArityStrength (labelToArity {sys} r x))

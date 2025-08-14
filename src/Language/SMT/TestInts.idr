@@ -28,26 +28,30 @@ public export
 data TestIntsOps = AInt | Add
 
 public export
+record IntsReq (sort : Type) where
+  constructor IntsFulfill
+  bool, int : sort
+
+public export
 labelToArity : {0 sys : SortingSystemOver b s sort} ->
-  (a : sort) -> TestIntsOps -> Arity b sort
-labelToArity a AInt = Const a Int
-labelToArity a Add  = [a, a] :=> a
+  (r : IntsReq sort) -> TestIntsOps -> Arity b sort
+labelToArity r AInt = Const r.int Int
+labelToArity r Add  = [r.int, r.int] :=> r.int
 
 public export
 0
-TestIntsSig : (sys : SortingSystemOver fstSort sndSort sort) ->
-  (a : sort) -> sys.RSortedFamilyFun
-TestIntsSig sys a = CoProd (arity . labelToArity {sys} a)
+TestIntsSig : IntsReq .Signature
+TestIntsSig sys r = CoProd (arity . labelToArity {sys} r)
 
 public export
 TestIntsSigMap : {sys : SortingSystemOver b s sort} ->
-  (a : sort) ->
-  (TestIntsSig sys a).RSortedFamilyFunctor
-TestIntsSigMap a = CoProdMap (\x => ArityMap (labelToArity {sys} a x))
+  (r : IntsReq sort) ->
+  (TestIntsSig sys r).RSortedFamilyFunctor
+TestIntsSigMap r = CoProdMap (\x => ArityMap (labelToArity {sys} r x))
 
 public export
 TestIntsPointedClosedStrength : {sys : SortingSystemOver b s sort} ->
-  (a : sort) ->
-  (TestIntsSig sys a).PointedClosedStrength
-TestIntsPointedClosedStrength a = CoProdPointedClosedStrength
-  (\x => ArityStrength (labelToArity {sys} a x))
+  (r : IntsReq sort) ->
+  (TestIntsSig sys r).PointedClosedStrength
+TestIntsPointedClosedStrength r = CoProdPointedClosedStrength
+  (\x => ArityStrength (labelToArity {sys} r x))
