@@ -1,8 +1,6 @@
 |||
 module Language.SMT.Signature
 
-import Language.SMT.Fullfill
-
 import MAST.Signature
 import MAST.Core
 import MAST.Initiality

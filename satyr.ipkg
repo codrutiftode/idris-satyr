@@ -21,11 +21,10 @@ modules
   = Language.SAT
   , Language.SAT.Dimacs
   , Language.SMT.Core
-  , Language.SMT.Fullfill
   , Language.SMT.Signature
   , Language.SMT.Arity
   , Language.SMT.Core
-  , Language.SMT.Ints
+  --, Language.SMT.Ints
   , Language.SMT.Quantifiers
   , Language.SMT.Functions
 

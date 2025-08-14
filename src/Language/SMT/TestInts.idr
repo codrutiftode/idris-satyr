@@ -1,7 +1,6 @@
 module Language.SMT.TestInts
 
 import Language.SMT.Signature
-import Language.SMT.Fullfill
 import Language.SMT.Arity
 import Language.SMT.Core
 import Language.SMT.Serialise

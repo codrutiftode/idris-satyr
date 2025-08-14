@@ -1,6 +1,5 @@
 module Language.SMT.Core
 
-import Language.SMT.Fullfill
 import Language.SMT.Signature
 import Language.SMT.Arity
 
