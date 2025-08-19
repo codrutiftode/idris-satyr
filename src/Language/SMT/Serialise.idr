@@ -10,6 +10,7 @@ import MAST.Signature
 import MAST.Initiality
 import Data.String
 import Data.List1
+import Data.Singleton
 
 %hide Data.List.sort
 
@@ -21,6 +22,16 @@ public export
 data Names : sort.Ctx -> Type where
   Z : Names [<]
   S : Name -> Names ctx -> Names (ctx :< (x :- ty))
+
+public export
+toSnoc : Names ctx -> SnocList Name
+toSnoc Z = [<]
+toSnoc (S n ns) = toSnoc ns :< n
+
+public export
+concatNames : {b : _} -> Names a -> Names b -> Names (a ++ b)
+concatNames {b = [<]} x Z = x
+concatNames {b = (ctx :< (v :- s))} x (S d ns) = S d (concatNames x ns)
 
 public export
 findLast : String -> Names ctx -> Maybe Name
@@ -68,56 +79,110 @@ lookup : (ps : Names ctx) -> Strings .subst ctx ctx
 lookup ps = toSubst {ctx} Strings (lookupNamed ps)
 
 public export
-Serialised : sort.SortedFamilyOver sort
-Serialised s ctx = Var s ctx
+lookupNameNamed : (ps : Names ctx) -> (const $ const Name) .substNamed ctx ctx
+lookupNameNamed (S n _) Here = n
+lookupNameNamed (S _ ps) (There v) = lookupNameNamed ps v
 
 public export
-SerialisedCoalg : Serialised .SortedBoxCoalgebraStructure
-SerialisedCoalg v ren = ren v
+lookupName : (ps : Names ctx) -> (const $ const Name) .subst ctx ctx
+lookupName ps = toSubst {ctx} (const $ const Name) (lookupNameNamed ps)
 
 public export
-SerialisedPoint : Point Serialised
-SerialisedPoint = id
+NamesCovPsh : {b : _} -> a ~> b -> Names a -> Names b
+NamesCovPsh {b = [<]} f x = Z
+NamesCovPsh {b = (ctx :< (v :- ty))} f x =
+  S (lookupName x (f (Here .toVar))) (NamesCovPsh (\v' => f (ThereVar v')) x)
 
 public export
+namesR : {a, b : _} -> Names (a ++ b) -> Names a
+namesR x = NamesCovPsh (weakr _ _) x
+
+public export
+namesL : {a, b : _} -> Names (a ++ b) -> Names b
+namesL x = NamesCovPsh (weakl _ _) x
+
+public export
+SerialiseParam : sort.SortedFamilyOver sort
+SerialiseParam s ctx = Var s ctx
+
+public export
+SerialiseParamCoalg : SerialiseParam .SortedBoxCoalgebraStructure
+SerialiseParamCoalg v ren = ren v
+
+public export
+SerialiseParamPoint : Point SerialiseParam
+SerialiseParamPoint = id
+
+public export
+0
 SerialiseTarget : sort.SortedFamilyOver b
-SerialiseTarget s ctx = Names ctx -> Strings s ctx
+SerialiseTarget s ctx =
+  (dtx : b.Ctx ** (Names dtx, Names dtx -> String, ctx ~> dtx))
 
 public export
 0
 (.Serialiser) : (0 sys : SortingSystemOver fstSort sndSort sort) -> (syn : sys.RSortedFamily) -> Type
-sys.Serialiser syn = syn -|> (SerialiseTarget <-# Serialised)
+sys.Serialiser syn = syn -|> (SerialiseTarget <-# SerialiseParam)
 
 public export
 serialise : (synAlg : Algebra sys o mvar syn) ->
   (fold : FamInitial sys synAlg) ->
   (strength : o.PointedClosedStrength) ->
-  RelativeAlgebra sys o mvar SerialisedCoalg SerialisedPoint SerialiseTarget ->
+  RelativeAlgebra sys o mvar SerialiseParamCoalg SerialiseParamPoint SerialiseTarget ->
   sys.Serialiser syn
 serialise synAlg fold strength relAlg = fold .traverse
-  { synAlg = synAlg,
-    point = SerialisedPoint,
-    coalg = SerialisedCoalg} strength relAlg
+  { synAlg,
+    point = SerialiseParamPoint,
+    coalg = SerialiseParamCoalg} strength relAlg
+
+public export
+serialiseAction : (synAlg : Algebra sys o mvar syn) ->
+  (fold : FamInitial sys synAlg) ->
+  (strength : o.PointedClosedStrength) ->
+  (meta : mvar -|> SerialiseTarget) ->
+  (act : TraverseAction sys o SerialiseTarget SerialiseParam) ->
+  sys.Serialiser syn
+serialiseAction synAlg fold strength meta act =
+  fold.traverseAction {synAlg,
+    point = SerialiseParamPoint,
+    coalg = SerialiseParamCoalg} meta strength act
 
 public export
 serialiseTerm :
   {sys : SortingSystemOver fstSort sndSort sort} ->
   (strength : o.PointedClosedStrength) ->
   o.RSortedFamilyFunctor ->
-  RelativeAlgebra sys o mvar SerialisedCoalg SerialisedPoint SerialiseTarget ->
+  RelativeAlgebra sys o mvar SerialiseParamCoalg SerialiseParamPoint SerialiseTarget ->
   sys.Serialiser (Term sys o mvar)
 serialiseTerm strength oMap relAlg =
   serialise TermAlgebra (TermInitial oMap) strength relAlg
 
-makeRelativeAlgebra :  (alg : o SerialiseTarget -|> SerialiseTarget) ->
-  RelativeAlgebra sys o MVar SerialisedCoalg SerialisedPoint SerialiseTarget
-makeRelativeAlgebra alg = MkRelativeAlgebra
-  { alg
-  , val = \v, names => lookup names v
-  , menv = \meta => const (meta.snd.fst)
-  }
+-- (-|>-) : {sys : SortingSystemOver fstSort sndSort sort} ->
+--          sys.RSortedFamily -> sys.RSortedFamily -> Type
+-- a -|>- b = ?wh
+
+
+public export
+serialiseActionTerm :
+  {sys : SortingSystemOver fstSort sndSort sort} ->
+  (strength : o.PointedClosedStrength) ->
+  o.RSortedFamilyFunctor ->
+  (meta : mvar -|> SerialiseTarget) ->
+  TraverseAction sys o SerialiseTarget SerialiseParam ->
+  sys.Serialiser (Term sys o mvar)
+serialiseActionTerm strength oMap meta act =
+  serialiseAction TermAlgebra (TermInitial oMap) strength meta act
+
+public export
+SerialiseAction : (sys : SortingSystemOver b s sort) ->
+  SerialiseTarget <#> (SerialiseTarget . sys.fst) -|> SerialiseTarget
+SerialiseAction sys (fst `Evidence` snd) = ?what2_0
+
+-- serialiseMeta : MVar -|> SerialiseTarget
+-- serialiseMeta m names = ?serialiseMetap_rhs
 
 -- TODO: refactor the names of serialising functions
+{-
 public export
 serialiser : {sys : SortingSystemOver fstSort sndSort sort} ->
   (alg : o SerialiseTarget -|> SerialiseTarget) ->

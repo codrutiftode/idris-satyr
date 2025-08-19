@@ -10,12 +10,6 @@ import Data.List.Quantifiers
 %hide MAST.Core.(.Fam) -- Maybe we ought to rename MAST.Sorted.Core.(.SimpleFam)
   -- TODO: Upstream this ^ comment to MAST.
 
--- TODO: should be moved to MAST
-public export
-0
-(.Sort) : (sys : SortingSystemOver fstSort sndSort sort) -> Type
-sys.Sort = sort
-
 -- Note: It might make more sense to impose requirement on the sorting
 -- system, i.e., the requirement can range over the first and second
 -- class sorts separately. So far we have not needed this level of
