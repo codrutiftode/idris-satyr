@@ -51,13 +51,10 @@ public export
 Strings : sort.SortedFamilyOver b
 Strings s ctx = String
 
-||| A sorted family of meta-variables
-public export
-MVar : sort.SortedFamilyOver bindable
-MVar = Strings
-
 ||| Homogeneous term in the signature
 public export
 0
-HomTerm : (sig : req.Signature) -> (r : req sort) -> sort.SortedFamilyOver sort
-HomTerm sig r = Term (HomSorting sort) (sig (HomSorting sort) r) MVar
+HomTerm : (sig : req.Signature) -> (r : req sort) ->
+          (mvar : sort.SortedFamilyOver sort) ->
+          sort.SortedFamilyOver sort
+HomTerm sig r mvar = Term (HomSorting sort) (sig (HomSorting sort) r) mvar

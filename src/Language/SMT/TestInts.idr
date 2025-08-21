@@ -57,7 +57,8 @@ TestIntsStrength r = CoProdPointedClosedStrength
   (\x => ArityStrength (labelToArity {sys} r x))
 
 public export
-TestIntsSigSerialise : {r : _} -> (TestIntsSig sys r) SerialiseTarget -|> SerialiseTarget
+TestIntsSigSerialise : {r : _} ->
+  (TestIntsSig sys r) SerialiseTarget -|> SerialiseTarget
 TestIntsSigSerialise (AInt ** (Pack x)) =
   ([<] ** (Z, const (cast x), \((%%) {pos = _} name) impossible))
 TestIntsSigSerialise (Add ** (Pack [x, y])) =

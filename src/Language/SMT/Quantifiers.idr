@@ -38,7 +38,9 @@ labelToArity : {0 sys : SortingSystemOver b s sort} ->
   (r : CoreReq sort) ->
   QuantOps -> Arity b sort
 labelToArity r _ =
-  CoProd (\x => CoProd (\a : b => [([<(x, a)], r.bool), ([<(x, a)], r.bool)] ::=> r.bool))
+  CoProd (\x =>
+  CoProd (\a : b =>
+  [([<(x, a)], r.bool), ([<(x, a)], r.bool)] ::=> r.bool))
 
 public export
 0
@@ -63,13 +65,6 @@ second {b = (ctx :< (v :- ty))} f ((%%) {pos = (There x)} name) =
 [<].extOf ((%%) {pos = _} name) impossible
 (ctx :< (_ :- ty)).extOf ((%%) {pos = Here} name) = name :- ty
 (ctx :< ext).extOf ((%%) {pos = (There x)} name) = ctx.extOf x.toVar
-
-total
-copair : {dtx : sort.Ctx} -> (Var s ctx -> c) -> (Var s dtx -> c) -> Var s (ctx ++ dtx) -> c
-copair {dtx = [<]} f g v = f v
-copair {dtx = dtx :< (x :- s)} f g ((%%) {pos = Here} x) = g ((%%) x)
-copair {dtx = dtx :< (x :- s)} f g ((%%) {pos = (There y)} name) =
-  copair {dtx} f (g . ThereVar) (y .toVar)
 
 {-
 data Thin : (ctx : sort.Ctx) -> Type where
@@ -195,10 +190,6 @@ data Compl : a `Thins` c -> b `Thins` c -> Type where
   Zero : Compl Id Id
   KeepLeft : Compl t1 t2 -> Compl (Keep t1) (Drop t2)
   KeepRight : Compl t1 t2 -> Compl (Drop t1) (Keep t2)
-
--- TODO: should go into MAST?
-LinTerminal : ctx ~> [<]
-LinTerminal (%% _) impossible
 
 filterA : {ctx : sort.Ctx} ->
   Div ctx a b ->
@@ -345,21 +336,21 @@ QuantSigVal sys {ty} v = ([<("_" :- ty)] **
   (S ("_", 0) Z, \ns => mangleSchema (lookupName ns (Here  .toVar)),
     \((%%) {pos = Here} _) => v))
 
-serialiseQuant : (r : CoreReq sort) -> (HomSorting sort) .Serialiser (HomTerm QuantSig r)
+testMeta : Names ctx -> String
+testMeta Z = ""
+testMeta (S n ns) = "(+ \{testMeta ns} \{mangleSchema n})"
+
+serialiseQuant : (r : CoreReq sort) -> (HomSorting sort) .Serialiser (HomTerm QuantSig r MVar)
 serialiseQuant r = serialiseActionTerm {sys = HomSorting sort}
   (QuantSigStrength {r, sys = HomSorting sort})
   (QuantSigMap {r, sys = HomSorting sort})
-  ?metaTODO
+  (serialiseMeta {ty} (const $ testMeta))
   (MkTraverseAction
-    { alg = QuantSigSerialise
+    { alg = QuantSigSerialise {sys = HomSorting sort}
     , val = QuantSigVal (HomSorting sort)
-    , action = SerialiseAction (HomSorting sort)
+    , action = SerialiseAction {ty} (HomSorting sort)
     }
   )
-
--- serialiseQuant r = ?hmm (QuantSigSerialise {sys = HomSorting sort})
---   (QuantSigStrength {r, sys = HomSorting sort})
---   (QuantSigMap {r, sys = HomSorting sort})
 
 data TheSorts : Type where
   BoolS : TheSorts
@@ -367,9 +358,19 @@ data TheSorts : Type where
 Fulfill : CoreReq TheSorts
 Fulfill = CoreFulfill BoolS
 
-term0 : HomTerm QuantSig Fulfill BoolS [<("x" :- BoolS)]
+term0 : HomTerm QuantSig Fulfill MVar BoolS [<("x" :- BoolS)]
 term0 = Op (Forall ** ("x" ** (BoolS ** Pack {ty' = ()}
   [Var $ Here .toVar, Var $ (There Here) .toVar])))
+
+term1 : HomTerm QuantSig Fulfill MVar BoolS [<("b" :- BoolS)]
+term1 = Op (Forall ** ("y" ** (BoolS ** Pack {ty' = ()}
+  [Var $ Here .toVar,
+   MVar ([<("y" :- BoolS)] `Evidence`
+     ((Val [<("y" :- BoolS)] ** (S ("y", 0) Z, "m")), \case
+       ((%%) {pos = Here} _) =>
+         Op (Forall ** ("z" ** (BoolS **
+           Pack {ty' = ()} [Var ((There Here).toVar), Var (%% "z")]
+           )))))])))
 
 {-
 term1 : HomTerm QuantSig Fulfill BoolS [<("x" :- BoolS)]
@@ -379,16 +380,16 @@ term1 = Op (Forall ** ("x" **
   ])))
 -}
 
-term2 : HomTerm QuantSig Fulfill BoolS [<("a" :- BoolS), ("a" :- BoolS), ("a" :- BoolS)]
+term2 : HomTerm QuantSig Fulfill MVar BoolS [<("a" :- BoolS), ("a" :- BoolS), ("a" :- BoolS)]
 term2 = Var ((Here) .toVar)
 
-test : {ctx : _} -> {s : _} -> {auto ps : PS ctx} -> HomTerm QuantSig Fulfill s ctx -> String
+test : {ctx : _} -> {s : _} -> {auto ps : PS ctx} -> HomTerm QuantSig Fulfill MVar s ctx -> String
 test t =
   let (dtx ** (ns, s, ren)) = serialiseQuant Fulfill t ctx id
       nctx : Names ctx = cast ps
   in s (NamesCovPsh ren (mangleGlobal nctx))
 
-test2 : {ctx : _} -> {s : _} -> {auto ps : PS ctx} -> HomTerm QuantSig Fulfill s ctx -> SnocList String
+test2 : {ctx : _} -> {s : _} -> {auto ps : PS ctx} -> HomTerm QuantSig Fulfill MVar s ctx -> SnocList String
 test2 t =
   let (dtx ** (ns, s, ren)) = serialiseQuant Fulfill t ctx id
       nctx : Names ctx = cast ps
