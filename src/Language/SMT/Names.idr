@@ -30,6 +30,11 @@ Cast (PS ctx) (Names ctx) where
   cast (S {str} x) = S (str, 0) (cast x)
 
 public export
+psToNames : PS ctx -> Names ctx
+psToNames Z = Z
+psToNames (S {str} x) = S (str, 0) (psToNames x)
+
+public export
 findLast : String -> Names ctx -> Maybe Name
 findLast str Z = Nothing
 findLast str (S n ns) =
@@ -45,14 +50,22 @@ mangle str names = case findLast str names of
   Nothing => (str, 0)
   Just n  => (str, snd n + 1)
 
+||| Mangle all the names of `a` in the scope containing the names of `b`
 public export
-mangleGlobal : Names ctx -> Names ctx
-mangleGlobal Z = Z
-mangleGlobal (S n ns) = let mangled = mangleGlobal ns
-                        in S (mangle (fst n) mangled) mangled
+mangleGlobalInScope : {ctx : sort.Ctx} -> {0 dtx : sort.Ctx} ->
+  (a : Names ctx) -> (b : Names dtx) -> Names ctx
+mangleGlobalInScope Z scope = Z
+mangleGlobalInScope (S n ns) scope =
+  let mangled = mangleGlobalInScope ns scope
+  in S (mangle (fst n) (concatNames scope mangled)) mangled
+
+||| Mangle all the names of `a` in an empty scope
+public export
+mangleGlobal : {ctx : sort.Ctx} -> Names ctx -> Names ctx
+mangleGlobal a = mangleGlobalInScope a Z
 
 public export
-setupNames : PS ctx -> Names ctx
+setupNames : {ctx : sort.Ctx} -> PS ctx -> Names ctx
 setupNames = mangleGlobal . cast
 
 lookupNamed : (ps : Names ctx) -> Strings .substNamed ctx ctx

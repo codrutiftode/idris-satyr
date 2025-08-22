@@ -4,6 +4,8 @@ import MAST.Core
 import MAST.Substitution
 import Language.SMT.Names
 
+-- TODO: rename to thins
+
 -- TODO: duplicated definition
 -- TODO: remove this one and move to MAST
 public export

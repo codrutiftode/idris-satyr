@@ -44,7 +44,7 @@ MVar s ctx = (Singleton ctx, Names ctx, String)
 
 public export
 SerialiseParam : sort.SortedFamilyOver sort
-SerialiseParam s ctx = Var s ctx
+SerialiseParam = Var
 
 public export
 SerialiseParamCoalg : SerialiseParam .SortedBoxCoalgebraStructure
@@ -54,6 +54,8 @@ public export
 SerialiseParamPoint : Point SerialiseParam
 SerialiseParamPoint = id
 
+
+-- TODO: refactor into diamondtx and document diamondtx
 public export
 0
 SerialiseTarget : sort.SortedFamilyOver b
@@ -64,6 +66,12 @@ public export
 0
 SerialiseTargetPsh : SerialiseTarget .SortedPresheafStructure
 SerialiseTargetPsh ren (dtx ** (ns, s, ro)) = (dtx ** (ns, s, ren . ro))
+
+-- TODO: do we really need the record; can we use a type def instead?
+public export
+record (.SerialiseAlgebra) (o : (sort, b) ====> (sort', b')) where
+  constructor MkSerialiseAlgebra
+  alg : o SerialiseTarget -|> SerialiseTarget
 
 public export
 0
@@ -95,6 +103,7 @@ serialiseAction synAlg fold strength meta act =
     coalg = SerialiseParamCoalg} meta strength act
 
 public export
+partial
 serialiseTerm :
   {sys : SortingSystemOver fstSort sndSort sort} ->
   (strength : o.PointedClosedStrength) ->
@@ -151,6 +160,9 @@ serialiseActionTerm :
 serialiseActionTerm strength oMap meta act =
   serialiseAction TermAlgebra (TermInitial oMap) strength meta act
 
+-- TODO: refactor into a general tabulation function.
+-- maybe upstream to MAST; maybe upstream a version for SnocLists to Contrib
+-- but keep specialised version.
 mapVar : (ctx : sort.Ctx) ->
   ({s : sort} -> Var s ctx -> (dtx : sort.Ctx ** p dtx)) ->
   (xs : SnocList (sort.Ctx) ** All p xs)
@@ -179,10 +191,12 @@ Iterate p ctx =
   (f : ({s : sort} -> Var s dtx -> Target ctx)) ->
   p (CtxProd dtx f)
 
+public export
 0
 ProdFlat : (f : sort.Ctx -> Type) -> (xs : SnocList (sort.Ctx)) -> Type
 ProdFlat f xs = All f xs -> f (CtxProdFlat xs)
 
+public export
 NamesProdFlat : {xs : SnocList (sort.Ctx)} -> ProdFlat Names xs
 NamesProdFlat [<] = Z
 NamesProdFlat (x :< y) = concatNames (NamesProdFlat x) y
@@ -191,6 +205,7 @@ NamesProd : Iterate Names ctx
 NamesProd dtx f =
   NamesProdFlat $ mapProperty (fst . snd) $ snd (mapVar dtx f)
 
+public export
 RenProdFlat : {xs : SnocList (sort.Ctx)} -> ProdFlat (ctx ~>) xs
 RenProdFlat [<] = LinTerminal
 RenProdFlat (x :< ren) = copair (RenProdFlat x) ren
@@ -211,6 +226,13 @@ StringProdFlat [<] ns = ""
 StringProdFlat (ts :< (varName, t)) ns =
   varBinding (StringProdFlat ts (namesR ns)) varName (t (namesL ns))
 
+public export
+StringProdFlat' : {xs : SnocList (sort.Ctx)} ->
+  All (\x => Names x -> String) xs -> Names (CtxProdFlat xs) -> SnocList String
+StringProdFlat' [<] ns = [<]
+StringProdFlat' (ts :< t) ns =
+  (StringProdFlat' ts (namesR ns)) :< (t (namesL ns))
+
 StringProd : (dtx : sort.Ctx) ->
   Names dtx ->
   (f : ({s : sort} -> Var s dtx -> Target ctx)) ->
@@ -218,6 +240,8 @@ StringProd : (dtx : sort.Ctx) ->
 StringProd dtx ndtx f =
   StringProdFlat $ mapProperty (\y => (y.fst, y.snd.snd.fst)) $ snd (mapVar dtx f)
 
+-- TODO: refactor so that we use SerialiseTarget instead of Target,
+-- and zip the variable names with their terms when let-binding.
 public export
 (.SerialiseAction) : (sys : SortingSystemOver b s sort) ->
   SerialiseTarget <#> (SerialiseTarget . sys.fst) -|> SerialiseTarget {b}

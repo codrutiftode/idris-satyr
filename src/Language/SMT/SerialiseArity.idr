@@ -13,31 +13,68 @@ import MAST.Presheaf
 import MAST.Signature
 import MAST.Initiality
 
-import MAST.Combinator.Restrict
-import MAST.Combinator.Extend
-import MAST.Combinator.List.Quantifiers
-import MAST.Combinator.CoProd
-import MAST.Combinator.Prod
-import MAST.Combinator.Const
-import MAST.Combinator.Compose
-import MAST.Combinator.Shift
+import Data.Singleton
+import Data.List.Quantifiers
 
+import Language.SMT.Combinator.Restrict
+import Language.SMT.Combinator.Extend
+import Language.SMT.Combinator.Const
+import Language.SMT.Combinator.Compose
+import Language.SMT.Combinator.CoProd
+import Language.SMT.Combinator.List.Quantifiers
+import Language.SMT.Combinator.Shift
+
+public export
+0
 Metadata : Arity b sort -> Type
 Metadata (Const _ ty) = ty -> String
-Metadata (CoProd f) = ?Metadata_rhs_1
-Metadata (xs :=> ret) = ?Metadtaa_rhs_2
-Metadata (as ::=> ret) = ?Metadata_rhs_3
+Metadata (CoProd {arg} f) = (i : arg) -> Metadata (f i)
+Metadata (xs :=> ret) = SnocList String -> String
+Metadata (as ::=> ret) = SnocList String -> String
 
+nodeAlg : {xs : List sort} ->
+  (SnocList String -> String) ->
+  (Node xs).SerialiseAlgebra
+nodeAlg {xs = []} toStr = ConstSerialise (const $ const ()) (const $ toStr [<])
+nodeAlg {xs = [x]} toStr = RestrictSerialise (const x)
+nodeAlg {xs = xs@(x :: y :: _)} toStr = AllSerialise
+                                  (mapIntoComposite (\t =>
+                                  RestrictSerialise (const t)) xs)
+                                  toStr
+
+-- TODO: could be moved to MAST?
+snocListHasPS : (vars : SnocList (String, b)) -> PS (cast {to = b.Ctx} vars)
+snocListHasPS [<] = Z
+snocListHasPS (sx :< (x, s)) = S (snocListHasPS sx)
+
+public export
 arityAlg : {sys : SortingSystemOver b s sort} ->
   (a : Arity b sort) ->
   Metadata a ->
-  (arity a) SerialiseTarget -|> SerialiseTarget
-arityAlg (Const ret y) m (Pack x) = ([<] ** (Z, const (m x), LinTerminal))
-arityAlg (CoProd f)    m x = ?serialiseArity_rhs_1
-arityAlg (xs :=> ret)  m (Pack x) =
-  (?left_0 ** ?left_1)
-arityAlg (as ::=> ret) m x = ?serialiseArity_rhs_3
+  (arity a).SerialiseAlgebra
+arityAlg (Const ret y) m = ComposeSerialise
+                             (ExtendSerialise (const ret))
+                             (ConstSerialise (const $ const y) m)
+                             (ExtendMap (const ret))
+arityAlg (CoProd f)    m = CoProdSerialise (\a => arityAlg {sys} (f a) (m a))
+arityAlg (xs :=> ret)  m = ComposeSerialise
+                             (ExtendSerialise (const ret))
+                             (nodeAlg m)
+                             (ExtendMap (const ret))
+arityAlg (as ::=> ret) m = ComposeSerialise
+                             (ExtendSerialise (const ret))
+                             (AllSerialise
+                               (mapIntoComposite (\(vars, subRet) =>
+                                ComposeSerialise
+                                   (ShiftSerialise (cast vars)
+                                     (cast $ snocListHasPS vars))
+                                   (RestrictSerialise (const subRet))
+                                   (ShiftMap (cast vars))) as)
+                                m)
+                             (ExtendMap (const ret))
 
+{-
+public export
 serialiseArity : {sys : SortingSystemOver b s sort} ->
   (a : Arity b sort) ->
   Metadata a ->

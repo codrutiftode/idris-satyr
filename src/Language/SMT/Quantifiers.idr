@@ -9,6 +9,15 @@ import Language.SMT.Core
 import Language.SMT.Serialise
 import Language.SMT.SerialiseAlg
 import Language.SMT.Names
+import Language.SMT.SerialiseArity
+
+import Language.SMT.Combinator.Restrict
+import Language.SMT.Combinator.Extend
+import Language.SMT.Combinator.Const
+import Language.SMT.Combinator.Compose
+import Language.SMT.Combinator.CoProd
+import Language.SMT.Combinator.List.Quantifiers
+import Language.SMT.Combinator.Shift
 
 import MAST.Core
 import MAST.Substitution
@@ -16,15 +25,6 @@ import MAST.Tensor
 import MAST.Signature
 import MAST.Initiality
 import MAST.Modality
-import MAST.Combinator.List
-import MAST.Combinator.Restrict
-import MAST.Combinator.Extend
-import MAST.Combinator.List.Quantifiers
-import MAST.Combinator.CoProd
-import MAST.Combinator.Prod
-import MAST.Combinator.Const
-import MAST.Combinator.Compose
-import MAST.Combinator.Shift
 import MAST.Sorted.Core
 
 import Data.List.Quantifiers
@@ -104,6 +104,33 @@ serialiseQuant r = serialiser (MkSerialiseWithAction
   , oStrength = QuantSigStrength {sys} r
   })
 
+Interpolation QuantOps where
+  interpolate Forall = "forall"
+  interpolate Exists = "exists"
+
+QuantSerialise : QuantOps -> (b -> String) ->
+  String -> b -> SnocList String -> String
+QuantSerialise op toStr x ty args =
+  let argsStr = joinBy " " (cast (args))
+  in "(\{op} ((\{x} \{toStr ty})) \{argsStr})"
+
+newSerialiseAlg : {sys : SortingSystemOver b s sort} ->
+  (b -> String) ->
+  (r : CoreReq sort) -> (QuantSig sys r).SerialiseAlgebra
+newSerialiseAlg toStr r = CoProdSerialise (\x => arityAlg {sys} (labelToArity {sys} r x)
+  (QuantSerialise x toStr))
+
+newSerialiser : {sys : SortingSystemOver fstSort sndSort sort} ->
+  (fstSort -> String) ->
+  (r : CoreReq sort) -> sys .Serialiser (Term sys (QuantSig sys r) MVar)
+newSerialiser toStr r = serialiser (MkSerialiseWithAction
+  { alg = (newSerialiseAlg {sys} toStr r).alg
+  , meta = QuantSigMeta {ty}
+  , isMVar = MVarValid
+  , oMap = QuantSigMap {sys} r
+  , oStrength = QuantSigStrength {sys} r
+  })
+
 data TheSorts : Type where
   BoolS : TheSorts
 
@@ -127,9 +154,14 @@ term1 = Op (Forall ** ("y" ** (BoolS ** Pack {ty' = ()}
 term2 : HomTerm QuantSig Fulfill MVar BoolS [<("a" :- BoolS), ("a" :- BoolS), ("a" :- BoolS)]
 term2 = Var ((Here) .toVar)
 
+term3 : HomTerm QuantSig Fulfill MVar BoolS [<("x" :- BoolS)]
+term3 = Op (Forall ** ("x" ** (BoolS ** Pack {ty' = ()}
+  [Var $ Here .toVar, Op (Exists ** ("y" ** (BoolS **
+    Pack {ty' = ()} [Var $ Here .toVar, Var $ Here .toVar])))])))
+
 test : {ctx : _} -> {s : _} -> {auto ps : PS ctx} -> HomTerm QuantSig Fulfill MVar s ctx -> String
 test t =
-  let (dtx ** (ns, s, ren)) = serialiseQuant Fulfill t ctx id
+  let (dtx ** (ns, s, ren)) = newSerialiser (\BoolS => "bool") Fulfill t ctx id
       nctx : Names ctx = cast ps
   in s (NamesCovPsh ren (mangleGlobal nctx))
 
