@@ -42,7 +42,7 @@ labelToArity : {0 sys : SortingSystemOver b s sort} ->
 labelToArity r _ =
   CoProd (\x =>
   CoProd (\a : b =>
-  [([<(x, a)], r.bool), ([<(x, a)], r.bool)] ::=> r.bool))
+  [([<(x, a)], r.bool)] ::=> r.bool))
 
 public export
 0
@@ -57,6 +57,7 @@ public export
 QuantSigStrength : (r : CoreReq sys.Sort) -> (QuantSig sys r).PointedClosedStrength
 QuantSigStrength r = CoProdPointedClosedStrength (\x => ArityStrength (labelToArity {sys} r x))
 
+{-
 public export
 total
 QuantSigSerialiseAlg : (QuantSig sys r) SerialiseTarget -|> SerialiseTarget
@@ -88,12 +89,14 @@ QuantSigSerialiseAlg (Exists ** (name ** (ty ** Pack [body1, body2]))) =
                    ++ ":" ++ s1 namesDtx1 ++ s2 namesDtx2 ++ ")",
              pair (filterA (label' dtx1 ren1)).label
                   (filterA (label' dtx2 ren2)).label))
+-}
 
 QuantSigMeta : MVar -|> Strings
 QuantSigMeta (_, Z, m) = ""
 QuantSigMeta (Val (ctx :< (x :- ty)), (S n ns), m) =
   "(+ \{QuantSigMeta {ty} (Val ctx, ns, m)} \{mangleSchema n})"
 
+{-
 serialiseQuant : {sys : SortingSystemOver fstSort sndSort sort} ->
   (r : CoreReq sort) -> sys .Serialiser (Term sys (QuantSig sys r) MVar)
 serialiseQuant r = serialiser (MkSerialiseWithAction
@@ -103,22 +106,29 @@ serialiseQuant r = serialiser (MkSerialiseWithAction
   , oMap = QuantSigMap {sys} r
   , oStrength = QuantSigStrength {sys} r
   })
+-}
 
 Interpolation QuantOps where
   interpolate Forall = "forall"
   interpolate Exists = "exists"
 
-QuantSerialise : QuantOps -> (b -> String) ->
-  String -> b -> SnocList String -> String
-QuantSerialise op toStr x ty args =
-  let argsStr = joinBy " " (cast (args))
-  in "(\{op} ((\{x} \{toStr ty})) \{argsStr})"
+QuantSerialise : QuantOps -> SnocList String -> String
+QuantSerialise op args = "(\{op} \{joinBy " " (cast (args))})"
+
+-- QuantSerialise' : QuantOps -> (b -> String) ->
+--   (x : String) -> (a : b) ->
+--   (SnocList String -> String,
+--    All (const $ (dtx : b .Ctx) -> Names dtx -> String -> String) [([<(x, a)], r.bool),
+--                                                                  ([<(x, a)], r.bool)])
 
 newSerialiseAlg : {sys : SortingSystemOver b s sort} ->
   (b -> String) ->
   (r : CoreReq sort) -> (QuantSig sys r).SerialiseAlgebra
-newSerialiseAlg toStr r = CoProdSerialise (\x => arityAlg {sys} (labelToArity {sys} r x)
-  (QuantSerialise x toStr))
+newSerialiseAlg toStr r = CoProdSerialise (\op =>
+  AritySerialise {sys} (labelToArity {sys} r op)
+    (\x, s =>
+      (QuantSerialise op,
+      [\dtx, (S n Z), body => "((\{mangleSchema n} \{toStr s})) \{body}"])))
 
 newSerialiser : {sys : SortingSystemOver fstSort sndSort sort} ->
   (fstSort -> String) ->
@@ -139,31 +149,27 @@ Fulfill = CoreFulfill BoolS
 
 term0 : HomTerm QuantSig Fulfill MVar BoolS [<("x" :- BoolS)]
 term0 = Op (Forall ** ("x" ** (BoolS ** Pack {ty' = ()}
-  [Var $ Here .toVar, Var $ (There Here) .toVar])))
+  [Var $ Here .toVar])))
 
 term1 : HomTerm QuantSig Fulfill MVar BoolS [<("b" :- BoolS)]
 term1 = Op (Forall ** ("y" ** (BoolS ** Pack {ty' = ()}
-  [Var $ Here .toVar,
-   MVar ([<("y" :- BoolS)] `Evidence`
+  [MVar ([<("y" :- BoolS)] `Evidence`
      ((Val [<("y" :- BoolS)], S ("y", 0) Z, "m"), \case
        ((%%) {pos = Here} _) =>
          Op (Forall ** ("z" ** (BoolS **
-           Pack {ty' = ()} [Var ((There Here).toVar), Var (%% "z")]
+           Pack {ty' = ()} [Var ((There Here).toVar)]
            )))))])))
 
 term2 : HomTerm QuantSig Fulfill MVar BoolS [<("a" :- BoolS), ("a" :- BoolS), ("a" :- BoolS)]
-term2 = Var ((Here) .toVar)
+term2 = Var ((There $ There Here) .toVar)
 
-term3 : HomTerm QuantSig Fulfill MVar BoolS [<("x" :- BoolS)]
+term3 : HomTerm QuantSig Fulfill MVar BoolS [<("y" :- BoolS)]
 term3 = Op (Forall ** ("x" ** (BoolS ** Pack {ty' = ()}
-  [Var $ Here .toVar, Op (Exists ** ("y" ** (BoolS **
-    Pack {ty' = ()} [Var $ Here .toVar, Var $ Here .toVar])))])))
+  [Op (Exists ** ("x" ** (BoolS **
+    Pack {ty' = ()} [Var $ (There (There Here)) .toVar])))])))
 
 test : {ctx : _} -> {s : _} -> {auto ps : PS ctx} -> HomTerm QuantSig Fulfill MVar s ctx -> String
-test t =
-  let (dtx ** (ns, s, ren)) = newSerialiser (\BoolS => "bool") Fulfill t ctx id
-      nctx : Names ctx = cast ps
-  in s (NamesCovPsh ren (mangleGlobal nctx))
+test = runSerialiser (newSerialiser (\BoolS => "bool") Fulfill)
 
 main : IO ()
 main = putStrLn (test term0)

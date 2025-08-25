@@ -4,8 +4,13 @@ import Language.SMT.Signature
 import Language.SMT.Arity
 import Language.SMT.Core
 import Language.SMT.Serialise
+import Language.SMT.SerialiseArity
 
 import Data.List.Quantifiers
+import Data.String
+import Data.Singleton
+
+import Language.SMT.Names
 
 import MAST.Core
 import MAST.Substitution
@@ -14,15 +19,17 @@ import MAST.Signature
 import MAST.Initiality
 import MAST.Modality
 import MAST.Presheaf
-import MAST.Combinator.List
-import MAST.Combinator.Restrict
-import MAST.Combinator.Extend
-import MAST.Combinator.List.Quantifiers
-import MAST.Combinator.CoProd
-import MAST.Combinator.Prod
-import MAST.Combinator.Const
-import MAST.Combinator.Compose
 import MAST.Simple.Core
+
+import Language.SMT.Combinator.Restrict
+import Language.SMT.Combinator.Extend
+import Language.SMT.Combinator.Const
+import Language.SMT.Combinator.Compose
+import Language.SMT.Combinator.CoProd
+import Language.SMT.Combinator.List.Quantifiers
+import Language.SMT.Combinator.Shift
+
+%hide Data.List.sort
 
 public export
 data TestIntsOps = AInt | Add
@@ -56,17 +63,16 @@ TestIntsStrength : {sys : SortingSystemOver b s sort} ->
 TestIntsStrength r = CoProdPointedClosedStrength
   (\x => ArityStrength (labelToArity {sys} r x))
 
+foo : (op : TestIntsOps) -> ArityMetadata (labelToArity {sys} r op)
+foo AInt = cast
+foo Add = \args => "(+ \{joinBy " " (cast args)})"
+
 public export
-TestIntsSigSerialise : {r : _} ->
-  (TestIntsSig sys r) SerialiseTarget -|> SerialiseTarget
-TestIntsSigSerialise (AInt ** (Pack x)) =
-  ([<] ** (Z, const (cast x), \((%%) {pos = _} name) impossible))
-TestIntsSigSerialise (Add ** (Pack [x, y])) =
-  case (x, y) of
-    ((dtx1 ** (ndtx1, s1, ren1)), (dtx2 ** (ndtx2, s2, ren2))) =>
-      (dtx1 ++ dtx2 ** (concatNames ndtx1 ndtx2,
-        \ns => "(+ " ++ s1 (namesR ns) ++ " " ++ s2 (namesL ns) ++ ")",
-          pair ren1 ren2))
+TestIntsSerialiseAlg : {sys : SortingSystemOver b s sort} ->
+  {r : _} -> (TestIntsSig sys r).SerialiseAlgebra
+TestIntsSerialiseAlg = CoProdSerialise (\op =>
+    AritySerialise {sys} (labelToArity {sys} r op)
+    (foo op))
 
 data IntSorts : Type where
   IntS, BoolS : IntSorts
@@ -74,34 +80,26 @@ data IntSorts : Type where
 Fulfill : IntsReq IntSorts
 Fulfill = IntsFulfill BoolS IntS
 
-SerialiseVal : Var -|> (SerialiseTarget . (HomSorting IntSorts).fst)
-SerialiseVal {ty} v = ([<("x" :- ty)] **
-  (S ("x", 0) Z, \ns => lookup ns (Here  .toVar),
-    \((%%) {pos = Here} _) => v))
+TestIntsMeta : MVar -|> Strings
+TestIntsMeta (_, Z, m) = ""
+TestIntsMeta (Val (ctx :< (x :- ty)), (S n ns), m) =
+  "(+ \{TestIntsMeta {ty} (Val ctx, ns, m)} \{mangleSchema n})"
 
-RelAlg : RelativeAlgebra (HomSorting IntSorts)
-  (TestIntsSig (HomSorting IntSorts) Fulfill) MVar
-  SerialiseParamCoalg SerialiseParamPoint SerialiseTarget
-RelAlg = MkRelativeAlgebra
-  { alg = TestIntsSigSerialise
-  , val = SerialiseVal
-  , menv = ?wowo
-  }
+TestIntsSerialiser : {sys, r : _} -> sys.Serialiser (Term sys (TestIntsSig sys r) MVar)
+TestIntsSerialiser = serialiser (MkSerialiseWithAction
+  { alg = (TestIntsSerialiseAlg {sys, r}).alg
+  , meta = TestIntsMeta {ty}
+  , isMVar = MVarValid
+  , oMap = TestIntsSigMap {sys} r
+  , oStrength = TestIntsStrength {sys} r
+  })
 
-serialiseTestInts : (HomSorting IntSorts).Serialiser (HomTerm TestIntsSig Fulfill)
-serialiseTestInts = serialiseTerm
-  (TestIntsStrength Fulfill)
-  (TestIntsSigMap Fulfill)
-  RelAlg
+term0 : HomTerm TestIntsSig Fulfill MVar IntS [<("x" :- IntS)]
+term0 = Op (Add ** Pack {ty' = ()} [Var (%% "x"), Op (AInt ** Pack {ty' = ()} 2)])
 
-term0 : HomTerm TestIntsSig Fulfill IntS [<("huh" :- IntS)]
-term0 = Op (Add ** Pack {ty' = ()} [Var (%% "huh"), Op (AInt ** Pack {ty' = ()} 2)])
-
-term1 : HomTerm TestIntsSig Fulfill IntS [<("a" :- IntS), ("b" :- IntS)]
+term1 : HomTerm TestIntsSig Fulfill MVar IntS [<("a" :- IntS), ("b" :- IntS)]
 term1 = Op (Add ** Pack {ty' = ()} [Var (%% "a"), Var (%% "b")])
 
-test : {ctx : _} -> {s : _} -> {auto ps : PS ctx} -> HomTerm TestIntsSig Fulfill s ctx -> String
-test t =
-  let (dtx ** (ns, s, ren)) = serialiseTestInts t ctx id
-      nctx : Names ctx = cast ps
-  in s (mangleGlobal (NamesCovPsh ren nctx))
+test : {ctx : IntSorts .Ctx} -> {s : IntSorts} -> {auto ps : PS ctx} ->
+  HomTerm TestIntsSig Fulfill MVar s ctx -> String
+test = runSerialiser TestIntsSerialiser

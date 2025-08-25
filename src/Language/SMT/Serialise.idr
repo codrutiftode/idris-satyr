@@ -274,3 +274,16 @@ serialiser (MkSerialiseWithAction meta isMVar alg oStrength oMap) =
     , val = sys.SerialiseVal
     , action = sys.SerialiseAction {ty}
     })
+
+public export
+||| Runs a `ser`ialiser on a `term` to get its string representation
+runSerialiser : {sys : SortingSystemOver fstSort sndSort sort} ->
+  {ctx : fstSort.Ctx} ->
+  {s : sort} ->
+  {auto ps : PS ctx} ->
+  (ser : sys.Serialiser (Term sys o mvar)) ->
+  (term : Term sys o mvar s ctx) ->
+  String
+runSerialiser ser term =
+  let (dtx ** (ns, s, ren)) = ser term ctx id
+  in s (NamesCovPsh ren (mangleGlobal (cast ps)))
