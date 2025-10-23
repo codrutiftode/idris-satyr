@@ -130,14 +130,20 @@ MVarValid = IsMvar
   }
 
 public export
+record (.MetaSerialise) (sys : SortingSystemOver b s sort)
+  (mvar : sys.RSortedFamily) where
+  constructor MkMetaSerialise
+  meta : mvar -|> Strings
+  isMVar : sys.IsMVar mvar
+
+public export
 record (.SerialiseWithAction)
   (sys : SortingSystemOver b s sort)
   (o : sys.RSortedFamilyFun)
   (mvar : sys.RSortedFamily) where
   constructor MkSerialiseWithAction
-  meta : mvar -|> Strings
-  isMVar : sys.IsMVar mvar
-  alg : o SerialiseTarget -|> (SerialiseTarget {b,sort})
+  meta : sys.MetaSerialise mvar
+  alg : o.SerialiseAlgebra
   oStrength : o.PointedClosedStrength
   oMap : o.RSortedFamilyFunctor
 
@@ -266,11 +272,11 @@ serialiser :
   {sys : SortingSystemOver fstSort sndSort sort} ->
   sys.SerialiseWithAction o mvar ->
   sys.Serialiser (Term sys o mvar)
-serialiser (MkSerialiseWithAction meta isMVar alg oStrength oMap) =
+serialiser (MkSerialiseWithAction meta alg oStrength oMap) =
   serialiseAction TermAlgebra (TermInitial oMap) oStrength
-    (buildMetaMap isMVar meta)
+    (buildMetaMap meta.isMVar meta.meta)
     (MkTraverseAction
-    { alg = alg
+    { alg = alg.alg
     , val = sys.SerialiseVal
     , action = sys.SerialiseAction {ty}
     })
@@ -287,3 +293,9 @@ runSerialiser : {sys : SortingSystemOver fstSort sndSort sort} ->
 runSerialiser ser term =
   let (dtx ** (ns, s, ren)) = ser term ctx id
   in s (NamesCovPsh ren (mangleGlobal (cast ps)))
+
+-- TODO: currently only supports serialising first-class sorts
+public export
+0
+(.SortSerialiser) : (sys : SortingSystemOver b s sort) -> Type
+sys.SortSerialiser = b -> String

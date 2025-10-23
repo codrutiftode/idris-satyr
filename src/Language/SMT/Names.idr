@@ -5,6 +5,11 @@ import Language.SMT.Signature
 import MAST.Core
 import MAST.Substitution
 
+||| Constant sorted family of strings
+public export
+Strings : sort.SortedFamilyOver b
+Strings s ctx = String
+
 public export
 Name : Type
 Name = (String, Int)

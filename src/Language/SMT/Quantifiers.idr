@@ -91,10 +91,7 @@ QuantSigSerialiseAlg (Exists ** (name ** (ty ** Pack [body1, body2]))) =
                   (filterA (label' dtx2 ren2)).label))
 -}
 
-QuantSigMeta : MVar -|> Strings
-QuantSigMeta (_, Z, m) = ""
-QuantSigMeta (Val (ctx :< (x :- ty)), (S n ns), m) =
-  "(+ \{QuantSigMeta {ty} (Val ctx, ns, m)} \{mangleSchema n})"
+
 
 {-
 serialiseQuant : {sys : SortingSystemOver fstSort sndSort sort} ->
@@ -130,16 +127,32 @@ newSerialiseAlg toStr r = CoProdSerialise (\op =>
       (QuantSerialise op,
       [\dtx, (S n Z), body => "((\{mangleSchema n} \{toStr s})) \{body}"])))
 
-newSerialiser : {sys : SortingSystemOver fstSort sndSort sort} ->
-  (fstSort -> String) ->
-  (r : CoreReq sort) -> sys .Serialiser (Term sys (QuantSig sys r) MVar)
-newSerialiser toStr r = serialiser (MkSerialiseWithAction
-  { alg = (newSerialiseAlg {sys} toStr r).alg
-  , meta = QuantSigMeta {ty}
+menv : MVar -|> Strings
+menv  (_, Z, m) = ""
+menv  (Val (ctx :< (x :- ty)), (S n ns), m) =
+  "(+ \{menv {ty} (Val ctx, ns, m)} \{mangleSchema n})"
+
+public export
+QuantSigMeta : sys.MetaSerialise MVar
+QuantSigMeta = MkMetaSerialise
+  { meta = ?aMenv -- TODO: connect this to menv above
   , isMVar = MVarValid
+  }
+
+public export
+QuantSigSerialiseAction : {sys, r : _} -> sys.SortSerialiser ->
+  sys.SerialiseWithAction (QuantSig sys r) MVar
+QuantSigSerialiseAction toStr = (MkSerialiseWithAction
+  { alg = newSerialiseAlg {sys} toStr r
+  , meta = QuantSigMeta
   , oMap = QuantSigMap {sys} r
   , oStrength = QuantSigStrength {sys} r
   })
+
+QuantSigSerialiser : {sys : SortingSystemOver fstSort sndSort sort} ->
+  sys.SortSerialiser ->
+  (r : CoreReq sort) -> sys .Serialiser (Term sys (QuantSig sys r) MVar)
+QuantSigSerialiser toStr r = serialiser (QuantSigSerialiseAction toStr)
 
 data TheSorts : Type where
   BoolS : TheSorts
@@ -169,7 +182,7 @@ term3 = Op (Forall ** ("x" ** (BoolS ** Pack {ty' = ()}
     Pack {ty' = ()} [Var $ (There (There Here)) .toVar])))])))
 
 test : {ctx : _} -> {s : _} -> {auto ps : PS ctx} -> HomTerm QuantSig Fulfill MVar s ctx -> String
-test = runSerialiser (newSerialiser (\BoolS => "bool") Fulfill)
+test = runSerialiser (QuantSigSerialiser (\BoolS => "bool") Fulfill)
 
 main : IO ()
 main = putStrLn (test term0)

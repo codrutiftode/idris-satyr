@@ -63,16 +63,16 @@ TestIntsStrength : {sys : SortingSystemOver b s sort} ->
 TestIntsStrength r = CoProdPointedClosedStrength
   (\x => ArityStrength (labelToArity {sys} r x))
 
-foo : (op : TestIntsOps) -> ArityMetadata (labelToArity {sys} r op)
-foo AInt = cast
-foo Add = \args => "(+ \{joinBy " " (cast args)})"
+opSerialise : (op : TestIntsOps) -> ArityMetadata (labelToArity {sys} r op)
+opSerialise AInt = cast
+opSerialise Add = \args => "(+ \{joinBy " " (cast args)})"
 
 public export
 TestIntsSerialiseAlg : {sys : SortingSystemOver b s sort} ->
   {r : _} -> (TestIntsSig sys r).SerialiseAlgebra
 TestIntsSerialiseAlg = CoProdSerialise (\op =>
     AritySerialise {sys} (labelToArity {sys} r op)
-    (foo op))
+    (opSerialise op))
 
 data IntSorts : Type where
   IntS, BoolS : IntSorts
@@ -80,19 +80,71 @@ data IntSorts : Type where
 Fulfill : IntsReq IntSorts
 Fulfill = IntsFulfill BoolS IntS
 
-TestIntsMeta : MVar -|> Strings
-TestIntsMeta (_, Z, m) = ""
-TestIntsMeta (Val (ctx :< (x :- ty)), (S n ns), m) =
-  "(+ \{TestIntsMeta {ty} (Val ctx, ns, m)} \{mangleSchema n})"
+public export
+infixr 3 =|>
 
-TestIntsSerialiser : {sys, r : _} -> sys.Serialiser (Term sys (TestIntsSig sys r) MVar)
-TestIntsSerialiser = serialiser (MkSerialiseWithAction
-  { alg = (TestIntsSerialiseAlg {sys, r}).alg
-  , meta = TestIntsMeta {ty}
-  , isMVar = MVarValid
+public export
+0
+(=|>) : (src,tgt : sort.SortedFamilyOver bindable) -> Type
+(src =|> tgt) = (ty : sort) -> (0 ctx : bindable.Ctx) -> src ty ctx -> tgt ty ctx
+
+implicate : src =|> tgt -> src -|> tgt
+implicate f x = f ty ctx x
+
+0
+MVar' : sort.SortedFamilyOver b
+MVar' s ctx = (Singleton s, MVar s ctx)
+
+record Gadget a where
+  constructor MkGadget
+  theA : a
+
+TestIntsMenv' : {0 sys : SortingSystemOver b s sort} -> (MVar' {sort,b} -|> Strings {sort,b})
+TestIntsMenv' (ty, (_, Z, m)) = ""
+TestIntsMenv' (ty, (Val (ctx :< (x :- ty')), (S n ns), m)) =
+  let (Val ty) = ty
+  in "(+ \{TestIntsMenv' {sys, ty} (Val ty, (Val ctx, ns, m))} \{mangleSchema n})"
+
+TestIntsMenv : {0 sys : SortingSystemOver b s sort} -> (MVar {sort,b} -|> Strings {sort,b})
+TestIntsMenv (_, Z, m) = ""
+TestIntsMenv (Val (ctx :< (x :- ty')), (S n ns), m) =
+  "(+ \{TestIntsMenv {sys, ty} (Val ctx, ns, m)} \{mangleSchema n})"
+
+TestIntsMenv'' : {0 sys : SortingSystemOver b s sort} ->
+  Gadget (MVar {sort,b} -|> Strings {sort,b})
+
+MVarValid' : sys.IsMVar MVar'
+MVarValid' = IsMvar
+  { info = snd
+  , updateNames = \ns => \(ty, (params,_,str)) => (ty, (params,ns,str))
+  }
+
+mkMetaSerialise : (meta : mvar =|> Strings) ->
+  (isMVar : sys.IsMVar mvar) ->
+  sys.MetaSerialise mvar
+mkMetaSerialise meta isMVar = MkMetaSerialise
+  { meta = implicate meta
+  , isMVar
+  }
+
+TestIntsMeta : {0 sys : SortingSystemOver b s sort} -> sys.MetaSerialise MVar
+TestIntsMeta = mkMetaSerialise
+  (\ty, ctx => TestIntsMenv {sys, ty, ctx})
+  (MVarValid {sys})
+
+{-
+public export
+TestIntsSerialiseAction : {sys, r : _} ->
+  sys.SerialiseWithAction (TestIntsSig sys r) MVar
+TestIntsSerialiseAction = (MkSerialiseWithAction
+  { alg = TestIntsSerialiseAlg {sys, r}
+  , meta = TestIntsMeta
   , oMap = TestIntsSigMap {sys} r
   , oStrength = TestIntsStrength {sys} r
   })
+
+TestIntsSerialiser : {sys, r : _} -> sys.Serialiser (Term sys (TestIntsSig sys r) MVar)
+TestIntsSerialiser = serialiser TestIntsSerialiseAction
 
 term0 : HomTerm TestIntsSig Fulfill MVar IntS [<("x" :- IntS)]
 term0 = Op (Add ** Pack {ty' = ()} [Var (%% "x"), Op (AInt ** Pack {ty' = ()} 2)])

@@ -73,7 +73,7 @@ mapIntoAll' xs f = zipPropertyWith (\(Val x), elem => f x elem) (remember xs) (a
 xs.mapIntoComposite' prf = ripple (mapIntoAll' xs prf)
 
 public export
-AritySerialise : {sys : SortingSystemOver b s sort} ->
+AritySerialise : {0 sys : SortingSystemOver b s sort} ->
   (a : Arity b sort) ->
   ArityMetadata a ->
   (arity a).SerialiseAlgebra

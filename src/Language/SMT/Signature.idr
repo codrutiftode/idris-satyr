@@ -46,11 +46,6 @@ HomSorting a = MkSortingSystemOver
   , copair = \f, _ => f
   }
 
-||| Constant sorted family of strings
-public export
-Strings : sort.SortedFamilyOver b
-Strings s ctx = String
-
 ||| Homogeneous term in the signature
 public export
 0
